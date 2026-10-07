@@ -16,6 +16,10 @@
   --red-soft: #fdecea;
   --blue: #2655c9;
   --blue-soft: #eaf0fd;
+  --violet: #6d4aff;
+  --violet-soft: #f1edff;
+  --teal: #0e8a9a;
+  --teal-soft: #e4f5f7;
 }
 
 @theme inline {
@@ -34,6 +38,10 @@
   --color-red-soft: var(--red-soft);
   --color-blue: var(--blue);
   --color-blue-soft: var(--blue-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -110,6 +118,7 @@ body {
 .pill-amber { background: var(--amber-soft); color: var(--amber); }
 .pill-red { background: var(--red-soft); color: var(--red); }
 .pill-blue { background: var(--blue-soft); color: var(--blue); }
+.pill-violet { background: var(--violet-soft); color: var(--violet); }
 .pill-gray { background: #f0f0ec; color: var(--muted); }
 
 .input {
@@ -133,6 +142,15 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+}
+
+/* AI Treasurer surface: a soft violet wash so the AI is always recognisable. */
+.treasurer-card {
+  border-color: rgba(109, 74, 255, 0.18);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(109, 74, 255, 0.10) 0%, rgba(109, 74, 255, 0) 55%),
+    radial-gradient(100% 120% at 0% 100%, rgba(14, 138, 154, 0.07) 0%, rgba(14, 138, 154, 0) 60%),
+    #fbfaff;
 }
 
 paypal-button,

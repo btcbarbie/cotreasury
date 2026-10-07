@@ -1,12 +1,14 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Clock, Landmark, Lock, Wallet } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
 import { CollectiveTabs } from '@/components/CollectiveTabs'
 import { ContributeButton } from '@/components/ContributeDialog'
+import { TreasurerPanel } from '@/components/TreasurerPanel'
+import { canApprove } from '@/lib/treasury'
 
 export default function CollectivePage({ params }: PageProps<'/c/[id]'>) {
   return (
@@ -29,11 +31,23 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
   const cur = collective.currency
 
   const stats = [
-    { label: 'Available to spend', value: treasury.availableCents, hint: 'Balance minus approved and in-flight spending', primary: true },
-    { label: 'Balance', value: treasury.confirmedBalanceCents, hint: 'Confirmed money in the PayPal account' },
-    { label: 'Committed', value: treasury.committedCents + treasury.pendingOutCents, hint: 'Approved, not yet settled' },
-    { label: 'Awaiting approval', value: treasury.awaitingApprovalCents, hint: 'Requests still being voted on' },
+    { label: 'Available to spend', value: treasury.availableCents, hint: 'Balance minus approved and in-flight spending', Icon: Wallet, tone: 'bg-accent-soft text-accent', primary: true },
+    { label: 'Balance', value: treasury.confirmedBalanceCents, hint: 'Confirmed money in the PayPal account', Icon: Landmark, tone: 'bg-teal-soft text-teal' },
+    { label: 'Committed', value: treasury.committedCents + treasury.pendingOutCents, hint: 'Approved, not yet settled', Icon: Lock, tone: 'bg-blue-soft text-blue' },
+    { label: 'Awaiting approval', value: treasury.awaitingApprovalCents, hint: 'Requests still being voted on', Icon: Clock, tone: 'bg-amber-soft text-amber' },
   ]
+
+  // Deterministic opening brief for the AI Treasurer panel: facts from the ledger, no model call.
+  const approverCount = collective.members.filter((m) => canApprove(m.role)).length
+  const openCount = collective.proposals.filter((p) => p.status === 'PENDING_APPROVAL').length
+  const topTier = collective.tiers.find((t) => t.requiredApprovals >= 3) ?? collective.tiers.at(-1)
+  const brief = [
+    `**${formatMoney(treasury.availableCents, cur)}** is available to spend right now.`,
+    openCount === 0 ? 'No requests are waiting for approval.' : `**${openCount}** request${openCount === 1 ? ' is' : 's are'} waiting for approval.`,
+    topTier
+      ? `Spending ${formatMoney(topTier.minCents, cur)} or more needs **${topTier.requiredApprovals} of ${approverCount}** approvers. Ask me whether something fits and I'll draft the request.`
+      : '',
+  ].join(' ')
 
   return (
     <>
@@ -66,17 +80,26 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
 
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className={`card p-4 sm:p-5 ${s.primary ? 'border-ink/15' : ''}`} title={s.hint}>
-            <div className="text-xs sm:text-sm text-muted">{s.label}</div>
-            <div className={`tabular mt-1 font-semibold tracking-tight ${s.primary ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
+          <div key={s.label} className={`card p-4 sm:p-5 ${s.primary ? 'border-accent/25 shadow-[0_1px_0_rgba(15,123,95,0.06)]' : ''}`} title={s.hint}>
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted">
+              <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${s.tone}`}>
+                <s.Icon size={13} strokeWidth={2.2} />
+              </span>
+              {s.label}
+            </div>
+            <div className={`tabular mt-2 font-semibold tracking-tight ${s.primary ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
               {formatMoney(s.value, cur)}
             </div>
           </div>
         ))}
       </div>
 
+      <TreasurerPanel collectiveId={collective.id} kind={collective.kind} currency={cur} brief={brief} />
+
       <CollectiveTabs
+        collectiveId={collective.id}
         currency={cur}
+        viewerId={viewer.id}
         viewerRole={viewer.role}
         members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role }))}
         tiers={collective.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals }))}
@@ -101,8 +124,9 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
           status: p.status,
           createdAt: p.createdAt.toISOString(),
           proposedBy: p.proposedBy?.name ?? null,
-          approvals: p.approvals.map((a) => ({ memberName: a.member.name, decision: a.decision })),
-          recipientCount: p.recipients.length,
+          proposedById: p.proposedById,
+          approvals: p.approvals.map((a) => ({ memberId: a.memberId, memberName: a.member.name, decision: a.decision })),
+          recipients: p.recipients.map((r) => ({ name: r.name, receiver: r.receiver, amountCents: r.amountCents })),
         }))}
       />
     </>

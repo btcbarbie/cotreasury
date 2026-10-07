@@ -108,11 +108,11 @@ async function createCollective(
 
 export async function createDemoCollectives(prisma: PrismaClient) {
   const scholarship = await createCollective(prisma, {
-    name: 'Ada Okafor Scholarship Fund',
+    name: 'Whitmore Family Scholarship Fund',
     purpose:
       'Alumni-funded scholarships for first-generation college students from Riverside High. Five trustees approve every award.',
     kind: 'SCHOLARSHIP_FUND',
-    paypalEmail: 'treasury@okaforfund.org',
+    paypalEmail: 'treasury@whitmorefund.org',
     domain: 'alumni.example',
     members: [
       { name: 'Grace Adeyemi', role: 'ADMIN' },
