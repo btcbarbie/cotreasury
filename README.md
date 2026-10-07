@@ -10,6 +10,8 @@ together, with AI as the financial coordinator and people in control.
 
 > AI coordinates. People govern. PayPal moves. The ledger remembers.
 
+**Live demo (PayPal sandbox):** https://cotreasury.up.railway.app
+
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 ## Status
