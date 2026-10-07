@@ -17,6 +17,11 @@ const SUGGESTIONS: Record<string, string[]> = {
     "Who hasn't paid their share yet?",
     'Who needs to approve a $3,000 payment?',
   ],
+  HOUSEHOLD: [
+    'Can we cover rent and still keep $1,000 spare?',
+    'Are we both up to date this month?',
+    'How close are we to the emergency fund goal?',
+  ],
   GROUP_TRIP: [
     'Can we afford a $1,400 apartment deposit?',
     "Who hasn't paid their share yet?",

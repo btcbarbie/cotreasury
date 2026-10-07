@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { connection } from 'next/server'
-import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, GraduationCap, HandHeart, Link2, Plane, Plus, Scale, Send, ShieldCheck, Sparkles, Trophy, UserX, Users } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, GraduationCap, HandHeart, Heart, Link2, Plane, Plus, Scale, Send, ShieldCheck, Sparkles, Trophy, UserX, Users } from 'lucide-react'
 import { listCollectives, myTreasuryIds } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 
 const KIND_META: Record<string, { label: string; Icon: typeof Users; tone: string; bar: string }> = {
   SCHOLARSHIP_FUND: { label: 'Scholarship fund', Icon: GraduationCap, tone: 'bg-violet-soft text-violet', bar: 'from-violet to-teal' },
+  HOUSEHOLD: { label: 'Household', Icon: Heart, tone: 'bg-red-soft text-red', bar: 'from-red to-violet' },
   GROUP_TRIP: { label: 'Group trip', Icon: Plane, tone: 'bg-blue-soft text-blue', bar: 'from-blue to-teal' },
   BOOSTER_CLUB: { label: 'Booster club', Icon: Trophy, tone: 'bg-amber-soft text-amber', bar: 'from-amber to-red' },
   COMMUNITY_FUND: { label: 'Community fund', Icon: HandHeart, tone: 'bg-accent-soft text-accent', bar: 'from-accent to-teal' },
@@ -185,7 +186,7 @@ async function DemoGrid() {
 
 function TreasuryGrid({ collectives, demo }: { collectives: Awaited<ReturnType<typeof listCollectives>>; demo?: boolean }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className={`grid gap-4 sm:grid-cols-2 ${collectives.length > 2 ? 'lg:grid-cols-3' : ''}`}>
       {collectives.map((c) => {
         const meta = KIND_META[c.kind] ?? { label: 'Treasury', Icon: Users, tone: 'bg-bg text-muted', bar: 'from-ink to-muted' }
         return (

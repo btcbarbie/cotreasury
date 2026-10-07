@@ -9,7 +9,7 @@ import { formatMoney } from './money'
 const DAY = 24 * 60 * 60 * 1000
 
 /** The showcase treasuries every visitor sees. */
-export const DEMO_NAMES = ['The Maya Thompson Scholarship 🎓', "Girls' Trip to Lisbon 🇵🇹"]
+export const DEMO_NAMES = ['The Maya Thompson Scholarship 🎓', "Girls' Trip to Lisbon 🇵🇹", '💍 The Johnsons']
 /** Earlier demo stories, replaced at startup. */
 export const RETIRED_DEMO_NAMES = ['Whitmore Family Scholarship Fund', 'Westfield Eagles Booster Club']
 
@@ -23,9 +23,7 @@ function emailFor(name: string, domain: string) {
   return `${name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '')}@${domain}`
 }
 
-async function createCollective(
-  prisma: PrismaClient,
-  data: {
+type DemoSeed = {
     name: string
     purpose: string
     kind: string
@@ -38,8 +36,9 @@ async function createCollective(
     contributions: { member: string; cents: number; daysAgo: number; memo?: string; goal?: string }[]
     payouts: { title: string; to: string; cents: number; daysAgo: number }[]
     goals: { title: string; kind: 'TARGET' | 'MONTHLY'; perMemberCents: number; dueInDays?: number; startedDaysAgo?: number }[]
-  },
-) {
+}
+
+async function createCollective(prisma: PrismaClient, data: DemoSeed) {
   const collective = await prisma.collective.create({
     data: {
       name: data.name,
@@ -172,8 +171,8 @@ export async function writeDemoHistory(prisma: PrismaClient, collectiveId: strin
   }
 }
 
-export async function createDemoCollectives(prisma: PrismaClient) {
-  const scholarship = await createCollective(prisma, {
+const DEMO_SEEDS: DemoSeed[] = [
+  {
     name: DEMO_NAMES[0],
     purpose:
       "Help us give Maya a chance to start college without carrying the whole burden herself. Maya has been accepted to Howard University. We're a group of family friends and former classmates putting money together to help cover her first year. Everyone can see what has come in, what's been approved, and what's been paid.",
@@ -216,9 +215,8 @@ export async function createDemoCollectives(prisma: PrismaClient) {
       { member: 'Chris Adeyemi', cents: 10_000, daysAgo: 6, goal: 'Books & laptop' },
     ],
     payouts: [{ title: 'Enrollment deposit', to: 'Howard University', cents: 50_000, daysAgo: 30 }],
-  })
-
-  const trip = await createCollective(prisma, {
+  },
+  {
     name: DEMO_NAMES[1],
     purpose:
       "Eight of us. One trip. One place to keep the money together. We're finally doing the trip we've been talking about for years. Everyone is putting in what they can, and we're using this treasury to keep contributions, bookings, and spending in one place.",
@@ -261,9 +259,62 @@ export async function createDemoCollectives(prisma: PrismaClient) {
       { title: 'Apartment deposit: Alfama, 6 nights', to: 'Alfama apartment host', cents: 140_000, daysAgo: 40 },
       { title: 'Fado night reservation', to: 'Fado house in Alfama', cents: 24_000, daysAgo: 10 },
     ],
-  })
+  },
+  {
+    name: DEMO_NAMES[2],
+    purpose:
+      "Long-term partnership. We're building our life together, so we want our finances to work that way too. Both of us can contribute, see what's happening, and make decisions about our shared money without one person having to manage everything alone.",
+    kind: 'HOUSEHOLD',
+    paypalEmail: 'the.johnsons@example.com',
+    domain: 'home.example',
+    members: [
+      { name: 'Aaliyah Johnson', role: 'ADMIN' },
+      { name: 'Andre Johnson', role: 'APPROVER' },
+    ],
+    // Two people: every payment needs the other partner's yes.
+    tiers: [{ minCents: 0, maxCents: null, requiredApprovals: 1 }],
+    openingCents: 0,
+    openingDaysAgo: 95,
+    goals: [
+      { title: 'Monthly household pot', kind: 'MONTHLY', perMemberCents: 150_000, startedDaysAgo: 95 },
+      { title: 'Emergency fund', kind: 'TARGET', perMemberCents: 250_000, dueInDays: 120 },
+    ],
+    contributions: [
+      { member: 'Aaliyah Johnson', cents: 150_000, daysAgo: 92, goal: 'Monthly household pot' },
+      { member: 'Andre Johnson', cents: 150_000, daysAgo: 91, goal: 'Monthly household pot' },
+      { member: 'Aaliyah Johnson', cents: 150_000, daysAgo: 62, goal: 'Monthly household pot' },
+      { member: 'Andre Johnson', cents: 150_000, daysAgo: 61, goal: 'Monthly household pot' },
+      { member: 'Andre Johnson', cents: 50_000, daysAgo: 45, memo: 'Bonus from work', goal: 'Emergency fund' },
+      { member: 'Aaliyah Johnson', cents: 150_000, daysAgo: 31, goal: 'Monthly household pot' },
+      { member: 'Andre Johnson', cents: 150_000, daysAgo: 30, goal: 'Monthly household pot' },
+      { member: 'Aaliyah Johnson', cents: 75_000, daysAgo: 16, goal: 'Emergency fund' },
+      { member: 'Aaliyah Johnson', cents: 150_000, daysAgo: 2, goal: 'Monthly household pot' },
+    ],
+    payouts: [
+      { title: 'Rent', to: 'Parkside Apartments', cents: 210_000, daysAgo: 88 },
+      { title: 'Rent', to: 'Parkside Apartments', cents: 210_000, daysAgo: 58 },
+      { title: 'Car insurance (6 months)', to: 'Car insurer', cents: 59_000, daysAgo: 40 },
+      { title: 'Rent', to: 'Parkside Apartments', cents: 210_000, daysAgo: 28 },
+    ],
+  },
+]
 
-  return { scholarship, trip }
+/** Seed every showcase treasury (fresh database). */
+export async function createDemoCollectives(prisma: PrismaClient) {
+  const out = []
+  for (const seed of DEMO_SEEDS) out.push(await createCollective(prisma, seed))
+  return out
+}
+
+/** Seed any showcase treasury that's missing; returns the names it created. */
+export async function ensureDemoCollectives(prisma: PrismaClient) {
+  const existing = new Set((await prisma.collective.findMany({ where: { isDemo: true }, select: { name: true } })).map((c) => c.name))
+  const created: string[] = []
+  for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.name))) {
+    await createCollective(prisma, seed)
+    created.push(seed.name)
+  }
+  return created
 }
 
 /** Seal the activity history for a demo that doesn't have one yet. */
