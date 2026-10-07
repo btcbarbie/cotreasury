@@ -174,10 +174,7 @@ export default function Home() {
         <div className="flex items-center gap-2 text-sm font-medium text-accent">
           <ShieldCheck size={16} /> Built for trust
         </div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">AI reads, people decide</h2>
-        <p className="mt-3 max-w-2xl text-muted">
-          CoTreasury separates financial decisions from financial records, so no single person — or the AI — can quietly change what happened.
-        </p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">How CoTreasury keeps everyone honest</h2>
         <div className="mt-8 grid gap-x-8 gap-y-8 sm:grid-cols-2">
           {PRINCIPLES.map((p) => (
             <div key={p.title} className="flex gap-4">
