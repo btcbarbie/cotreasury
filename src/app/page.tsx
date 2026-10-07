@@ -82,6 +82,10 @@ export default function Home() {
         <p className="mt-5 text-sm font-medium tracking-tight sm:text-base">
           AI helps manage the treasury. Your group sets the rules. PayPal handles approved payments.
         </p>
+        <div className="mt-6">
+          <div className="text-sm font-medium tracking-tight">Built for groups that manage money together.</div>
+          <div className="mt-1 text-sm text-muted">Scholarship funds · Clubs · Communities · Group projects · Shared purchases</div>
+        </div>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/new" className="btn btn-primary !h-11 !px-5">
             Create a Treasury <ArrowRight size={16} />
