@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Hourglass, Scale, Send, UserCheck } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Hourglass, Scale, Send, UserCheck } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import type { GoalProgress } from '@/lib/goals'
 
@@ -33,7 +33,7 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
       const mine = isApprover && x.proposedById !== p.viewerId && !x.approvals.some((a) => a.memberId === p.viewerId)
       items.push({
         key: `p-${x.id}`,
-        group: mine ? 'Waiting for you' : 'Waiting for approvers',
+        group: 'Needs approval',
         tone: mine ? 'text-amber bg-amber-soft' : 'text-muted bg-bg',
         Icon: x.kind === 'RULE_CHANGE' ? Scale : mine ? UserCheck : Hourglass,
         title: label,
@@ -44,16 +44,26 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
       })
     }
     if (x.status === 'EXECUTING') {
-      items.push({ key: `e-${x.id}`, group: 'Money moving', tone: 'text-blue bg-blue-soft', Icon: Send, title: label, detail: 'PayPal is sending this payout. Each recipient updates when PayPal confirms.', action: 'requests' })
+      items.push({ key: `e-${x.id}`, group: 'Being paid out', tone: 'text-blue bg-blue-soft', Icon: Send, title: label, detail: 'PayPal is sending this payout. Each recipient updates when PayPal confirms.', action: 'requests' })
     }
     if (x.status === 'FAILED') {
       items.push({ key: `f-${x.id}`, group: 'Problems', tone: 'text-red bg-red-soft', Icon: AlertTriangle, title: label, detail: x.failureReason ?? 'The payout failed.', action: 'requests' })
     }
     for (const r of x.recipients) {
+      if (r.status === 'RETURNED') {
+        items.push({
+          key: `r-${x.id}-${r.receiver}`,
+          group: 'Problems',
+          tone: 'text-red bg-red-soft',
+          Icon: AlertTriangle,
+          title: `${m(r.amountCents)} to ${r.name} came back`,
+          detail: `PayPal returned the payout to ${r.receiver}. Check the email and raise a new request.`,
+        })
+      }
       if (r.status === 'UNCLAIMED') {
         items.push({
           key: `u-${x.id}-${r.receiver}`,
-          group: 'Money moving',
+          group: 'Problems',
           tone: 'text-amber bg-amber-soft',
           Icon: Clock,
           title: `${r.name} hasn't claimed ${m(r.amountCents)}`,
@@ -63,30 +73,10 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
     }
   }
 
-  for (const e of p.entries) {
-    if (e.type === 'CONTRIBUTION' && e.status === 'PENDING') {
-      items.push({ key: `c-${e.id}`, group: 'Money moving', tone: 'text-blue bg-blue-soft', Icon: Hourglass, title: `${m(e.amountCents)} from ${e.counterparty ?? 'a member'}`, detail: 'Paid in PayPal, waiting for PayPal to confirm before it counts.' })
-    }
-  }
-
-  for (const g of p.goals) {
-    if (g.daysLeft === null) continue
-    const days = g.daysLeft
-    const unpaid = g.members.filter((x) => !x.upToDate)
-    if (unpaid.length === 0 || days > 14) continue
-    items.push({
-      key: `g-${g.id}`,
-      group: days < 0 ? 'Problems' : 'Coming up',
-      tone: days < 0 ? 'text-red bg-red-soft' : 'text-amber bg-amber-soft',
-      Icon: CalendarClock,
-      title: `${g.title}: ${unpaid.length} member${unpaid.length === 1 ? '' : 's'} still to pay`,
-      detail: `${days < 0 ? `Overdue by ${-days} day${days === -1 ? '' : 's'}` : `Due in ${days} day${days === 1 ? '' : 's'}`}. Not yet paid in full: ${unpaid.map((x) => x.name.split(' ')[0]).join(', ')}.`,
-    })
-  }
   return items
 }
 
-const ORDER = ['Waiting for you', 'Problems', 'Money moving', 'Coming up', 'Waiting for approvers']
+const ORDER = ['Needs approval', 'Being paid out', 'Problems']
 
 export function AttentionPanel({ items, onOpenRequests }: { items: AttentionItem[]; onOpenRequests: () => void }) {
   if (items.length === 0) {
@@ -94,7 +84,7 @@ export function AttentionPanel({ items, onOpenRequests }: { items: AttentionItem
       <div className="card flex flex-col items-center px-6 py-14 text-center">
         <CheckCircle2 size={28} className="text-accent" />
         <div className="mt-3 font-medium">Nothing needs attention</div>
-        <p className="mt-1 max-w-sm text-sm text-muted">Every request is decided, every payment is confirmed by PayPal, and no goal is close to its deadline with members still to pay.</p>
+        <p className="mt-1 max-w-sm text-sm text-muted">No payouts are waiting for approval, being sent, or stuck.</p>
       </div>
     )
   }
