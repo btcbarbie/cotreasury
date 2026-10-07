@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyWebhookSignature, type PayPalCapture } from '@/lib/paypal'
 import { applyCaptureStatus } from '@/lib/ledger'
+import { applyBatchDenied, applyPayoutItem } from '@/lib/payouts'
+import type { PayoutBatch, PayoutItem } from '@/lib/paypal'
 
 const CAPTURE_EVENTS = new Set(['PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.CAPTURE.PENDING', 'PAYMENT.CAPTURE.DENIED'])
 
@@ -32,6 +34,10 @@ export async function POST(req: Request) {
 
   if (CAPTURE_EVENTS.has(event.event_type)) {
     await applyCaptureStatus(event.resource as PayPalCapture, 'PAYPAL_WEBHOOK')
+  } else if (event.event_type.startsWith('PAYMENT.PAYOUTS-ITEM.')) {
+    await applyPayoutItem(event.resource as PayoutItem, 'PAYPAL_WEBHOOK')
+  } else if (event.event_type === 'PAYMENT.PAYOUTSBATCH.DENIED') {
+    await applyBatchDenied((event.resource as PayoutBatch).batch_header.payout_batch_id)
   }
 
   await prisma.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } })

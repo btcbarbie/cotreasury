@@ -159,3 +159,53 @@ export async function verifyWebhookSignature(headers: Headers, rawBody: string):
   })
   return result.verification_status === 'SUCCESS'
 }
+
+// ---------- Payouts (approved spending out) ----------
+
+export type PayoutItemStatus = 'SUCCESS' | 'FAILED' | 'PENDING' | 'UNCLAIMED' | 'RETURNED' | 'ONHOLD' | 'BLOCKED' | 'REFUNDED' | 'REVERSED' | 'DENIED' | 'NEW' | 'UNPROCESSED'
+
+export type PayoutItem = {
+  payout_item_id: string
+  transaction_status: PayoutItemStatus
+  payout_batch_id: string
+  transaction_id?: string
+  payout_item: { sender_item_id?: string; receiver?: string; amount?: { value: string; currency: string } }
+  errors?: { name?: string; message?: string }
+}
+
+export type PayoutBatch = {
+  batch_header: { payout_batch_id: string; batch_status: string; sender_batch_header?: { sender_batch_id?: string } }
+  items?: PayoutItem[]
+}
+
+export function createPayoutBatch(opts: {
+  senderBatchId: string
+  subject: string
+  message: string
+  currency: string
+  items: { senderItemId: string; receiver: string; recipientType: string; amountCents: number; note: string }[]
+}) {
+  return paypal<PayoutBatch>('/v1/payments/payouts', {
+    method: 'POST',
+    // sender_batch_id is PayPal's own duplicate guard; the request id makes HTTP retries safe too.
+    requestId: `payout-${opts.senderBatchId}`,
+    body: {
+      sender_batch_header: {
+        sender_batch_id: opts.senderBatchId,
+        email_subject: opts.subject.slice(0, 255),
+        email_message: opts.message.slice(0, 1000),
+      },
+      items: opts.items.map((i) => ({
+        recipient_type: i.recipientType,
+        receiver: i.receiver,
+        amount: { value: (i.amountCents / 100).toFixed(2), currency: opts.currency },
+        sender_item_id: i.senderItemId,
+        note: i.note.slice(0, 4000),
+      })),
+    },
+  })
+}
+
+export function getPayoutBatch(batchId: string) {
+  return paypal<PayoutBatch>(`/v1/payments/payouts/${batchId}?fields=items&page_size=100`)
+}

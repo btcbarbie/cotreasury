@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { AlertTriangle, Check, Loader2, Scale, Sparkles, X } from 'lucide-react'
-import { decideRequest } from '@/app/c/[id]/actions'
+import { AlertTriangle, Check, Loader2, RotateCcw, Scale, Send, Sparkles, X } from 'lucide-react'
+import { decideRequest, refreshCollective, retryRequestPayout } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
@@ -30,7 +30,9 @@ type Proposal = {
   proposedBy: string | null
   proposedById: string | null
   approvals: { memberId: string; memberName: string; decision: string }[]
-  recipients: { name: string; receiver: string; amountCents: number }[]
+  recipients: { id: string; name: string; receiver: string; amountCents: number; status: string; paypalItemId: string | null }[]
+  paypalBatchId: string | null
+  failureReason: string | null
 }
 
 const TABS = ['Requests', 'Ledger', 'Rules', 'Members'] as const
@@ -105,11 +107,19 @@ export function CollectiveTabs(props: {
   )
 }
 
+const RECIPIENT_STATUS: Record<string, { label: string; pill: string; spin?: boolean }> = {
+  SENT: { label: 'Sending', pill: 'pill-blue', spin: true },
+  SUCCEEDED: { label: 'Paid', pill: 'pill-green' },
+  UNCLAIMED: { label: 'Sent · awaiting claim', pill: 'pill-amber' },
+  FAILED: { label: 'Failed', pill: 'pill-red' },
+  RETURNED: { label: 'Returned', pill: 'pill-red' },
+}
+
 const PROPOSAL_STATUS: Record<string, { label: string; pill: string }> = {
   PENDING_APPROVAL: { label: 'Awaiting approval', pill: 'pill-amber' },
   APPROVED: { label: 'Approved', pill: 'pill-blue' },
-  EXECUTING: { label: 'Paying out', pill: 'pill-blue' },
-  COMPLETED: { label: 'Paid', pill: 'pill-green' },
+  EXECUTING: { label: 'Sending via PayPal', pill: 'pill-blue' },
+  COMPLETED: { label: 'Paid via PayPal', pill: 'pill-green' },
   REJECTED: { label: 'Rejected', pill: 'pill-red' },
   FAILED: { label: 'Failed', pill: 'pill-red' },
 }
@@ -166,6 +176,38 @@ function RequestCard({
 }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
+  const executing = p.status === 'EXECUTING'
+
+  // While PayPal is sending, poll the payout status and refresh the page when it settles.
+  useEffect(() => {
+    if (!executing) return
+    let stop = false
+    const tick = async () => {
+      if (stop) return
+      const res = await fetch(`/api/proposals/${p.id}/payout`, { cache: 'no-store' })
+      if (res.ok) {
+        const d = (await res.json()) as { status: string; recipients: { id: string; status: string }[] }
+        setLiveStatus(Object.fromEntries(d.recipients.map((r) => [r.id, r.status])))
+        if (d.status !== 'EXECUTING') return void (await refreshCollective())
+      }
+      setTimeout(tick, 3000)
+    }
+    const t = setTimeout(tick, 2000)
+    return () => {
+      stop = true
+      clearTimeout(t)
+    }
+  }, [executing, p.id])
+
+  function retry() {
+    setError(null)
+    start(async () => {
+      const r = await retryRequestPayout(p.id)
+      if (!r.ok) setError(r.error)
+    })
+  }
+
   const approvals = p.approvals.filter((a) => a.decision === 'APPROVE').length
   const isRule = p.kind === 'RULE_CHANGE'
   const s = isRule && p.status === 'COMPLETED' ? { label: 'Applied', pill: 'pill-green' } : (PROPOSAL_STATUS[p.status] ?? { label: p.status, pill: 'pill-gray' })
@@ -229,15 +271,46 @@ function RequestCard({
 
       {p.recipients.length > 0 && (
         <ul className="mt-4 divide-y divide-line rounded-lg bg-bg/70 text-sm">
-          {p.recipients.map((r, i) => (
-            <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
-              <span className="min-w-0 truncate">
-                {r.name} <span className="text-muted">· {r.receiver}</span>
-              </span>
-              <span className="tabular shrink-0">{formatMoney(r.amountCents, currency)}</span>
-            </li>
-          ))}
+          {p.recipients.map((r) => {
+            const rs = RECIPIENT_STATUS[liveStatus[r.id] ?? r.status]
+            return (
+              <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="min-w-0 truncate">
+                  {r.name} <span className="text-muted">· {r.receiver}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {rs && (
+                    <span className={`pill ${rs.pill} !h-[20px] !text-[11px]`}>
+                      {rs.spin && <Loader2 size={11} className="animate-spin" />} {rs.label}
+                    </span>
+                  )}
+                  <span className="tabular">{formatMoney(r.amountCents, currency)}</span>
+                </span>
+              </li>
+            )
+          })}
         </ul>
+      )}
+
+      {executing && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-blue-soft px-3 py-2 text-sm text-blue">
+          <Send size={14} /> Approved by the collective. PayPal is sending the money; each recipient updates when PayPal confirms.
+        </div>
+      )}
+      {p.status === 'COMPLETED' && !isRule && p.paypalBatchId && (
+        <div className="mt-3 text-xs text-muted">
+          PayPal payout batch <span className="font-mono">{p.paypalBatchId}</span>
+        </div>
+      )}
+      {p.status === 'FAILED' && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">
+          <span>{p.failureReason ?? 'The payout failed.'}</span>
+          {isApprover && !p.recipients.some((r) => r.status === 'SUCCEEDED' || r.status === 'UNCLAIMED') && (
+            <button className="btn btn-ghost !h-7 !text-xs" onClick={retry} disabled={pending}>
+              <RotateCcw size={12} /> Retry payout
+            </button>
+          )}
+        </div>
       )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -267,7 +340,8 @@ function RequestCard({
               Reject
             </button>
             <button className="btn btn-primary !h-8 !bg-accent" onClick={() => decide('APPROVE')} disabled={pending}>
-              {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />} Approve
+              {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}{' '}
+              {!isRule && approvals + 1 >= p.requiredApprovals ? 'Approve & pay via PayPal' : 'Approve'}
             </button>
           </div>
         )}

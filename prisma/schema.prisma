@@ -74,6 +74,7 @@ model LedgerEntry {
   counterparty String?   // payer or recipient display name / email
   memberId     String?
   proposalId   String?
+  payoutRecipientId String? // PAYOUT rows: which recipient of the proposal this pays
   paypalRef    String?   // capture id / payout item id / transaction id
   createdAt    DateTime  @default(now())
   confirmedAt  DateTime?
@@ -101,6 +102,9 @@ model Proposal {
   flags             String?  // JSON [{code, message, extraApproval}] from deterministic risk checks
   changePayload     String?  // RULE_CHANGE only: JSON of the proposed rules, applied on approval
   paypalBatchId     String?
+  payoutAttempts    Int      @default(0)
+  executedAt        DateTime? // when the PayPal payout batch was sent
+  failureReason     String?
   createdAt         DateTime @default(now())
 
   collective        Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
@@ -117,6 +121,7 @@ model PayoutRecipient {
   receiver     String  // email / phone / Venmo handle
   receiverType String  @default("EMAIL") // "EMAIL" | "PHONE" | "VENMO_HANDLE"
   amountCents  Int
+  // PENDING → SENT (in a batch) → SUCCEEDED | UNCLAIMED | FAILED | RETURNED
   status       String  @default("PENDING")
   paypalItemId String?
 

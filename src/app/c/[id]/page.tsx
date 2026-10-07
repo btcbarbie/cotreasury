@@ -167,7 +167,9 @@ async function CollectiveContent({
           proposedBy: p.proposedBy?.name ?? null,
           proposedById: p.proposedById,
           approvals: p.approvals.map((a) => ({ memberId: a.memberId, memberName: a.member.name, decision: a.decision })),
-          recipients: p.recipients.map((r) => ({ name: r.name, receiver: r.receiver, amountCents: r.amountCents })),
+          recipients: p.recipients.map((r) => ({ id: r.id, name: r.name, receiver: r.receiver, amountCents: r.amountCents, status: r.status, paypalItemId: r.paypalItemId })),
+          paypalBatchId: p.paypalBatchId,
+          failureReason: p.failureReason,
         }))}
       />
     </>

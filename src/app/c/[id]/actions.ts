@@ -7,6 +7,7 @@ import { getViewer, viewerCookieName } from '@/lib/collectives'
 import { canApprove } from '@/lib/treasury'
 import { assessSpend, describeRuleChange, ruleChangeApprovals, validateRules, type RulesPayload } from '@/lib/governance'
 import type { DraftRequest } from '@/lib/treasurer'
+import { executePayout, retryPayout } from '@/lib/payouts'
 
 // Demo-mode identity switch: lets a judge act as different members (e.g. three
 // approvers) without separate logins. Not an authentication mechanism.
@@ -128,6 +129,25 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
     }
     await tx.proposal.update({ where: { id: proposalId }, data: { status } })
   })
+
+  // The collective has decided: the final approval sends the money through PayPal.
+  const after = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { status: true, kind: true } })
+  if (after?.kind === 'SPEND' && after.status === 'APPROVED') {
+    const sent = await executePayout(proposalId)
+    refresh()
+    return sent.ok ? { ok: true } : { ok: false, error: sent.error ?? 'PayPal payout failed.' }
+  }
   refresh()
   return { ok: true }
+}
+
+/** Approvers can resend a payout that PayPal rejected outright (nothing was paid). */
+export async function retryRequestPayout(proposalId: string): Promise<Result> {
+  const p = await prisma.proposal.findUnique({ where: { id: proposalId } })
+  if (!p) return { ok: false, error: 'Request not found.' }
+  const viewer = await getViewer(p.collectiveId)
+  if (!viewer || !canApprove(viewer.role)) return { ok: false, error: 'Only approvers can retry a payout.' }
+  const r = await retryPayout(proposalId)
+  refresh()
+  return r.ok ? { ok: true } : { ok: false, error: r.error ?? 'Retry failed.' }
 }
