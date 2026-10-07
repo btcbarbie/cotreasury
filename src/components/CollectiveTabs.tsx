@@ -404,7 +404,7 @@ function RequestCard({
             </button>
             <button className="btn btn-primary !h-8 !bg-accent" onClick={() => decide('APPROVE')} disabled={pending}>
               {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}{' '}
-              {!isRule && approvals + 1 >= p.requiredApprovals ? 'Approve & pay via PayPal' : 'Approve'}
+              {!isRule && approvals + 1 >= p.requiredApprovals ? 'Approve & release payout' : 'Approve'}
             </button>
           </div>
         )}

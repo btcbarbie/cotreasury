@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { AlertTriangle, Check, Loader2, Scale, UserCheck, X } from 'lucide-react'
+import { AlertTriangle, Check, Loader2, Scale, UserCheck } from 'lucide-react'
 import { decideRequest } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 
@@ -59,7 +59,7 @@ export function ApprovalsPill({ items, currency }: { items: PendingApproval[]; c
             ))}
           </div>
           <div className="border-t border-line bg-bg/60 px-4 py-2 text-xs text-muted">
-            You can&apos;t approve your own requests. The final approval sends the money through PayPal.
+            You can&apos;t approve your own requests.
           </div>
         </div>
       )}
@@ -79,53 +79,73 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
     start(async () => {
       const r = await decideRequest(p.id, decision)
       if (!r.ok) return setError(r.error)
-      setDone(decision === 'REJECT' ? 'Rejected' : deciding && !isRule ? 'Approved, PayPal is sending it' : 'Approved')
+      setDone(decision === 'REJECT' ? 'Rejected' : deciding && !isRule ? 'Approved. The group’s PayPal account is sending it.' : 'Approved')
     })
   }
 
   return (
-    <div className="px-4 py-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 font-medium">
-            {isRule && <Scale size={14} className="text-violet" />}
-            <span className="truncate">{p.title}</span>
-          </div>
-          <div className="text-xs text-muted">
-            Requested by {p.requestedBy ?? 'unknown'} · {p.approvals} of {p.required} approvals
-          </div>
+    <div className="px-5 py-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="min-w-0 font-semibold tracking-tight">
+          {isRule && <Scale size={14} className="mr-1.5 inline text-violet" />}
+          {p.title}
         </div>
-        {!isRule && <div className="tabular shrink-0 font-semibold">{formatMoney(p.amountCents, currency)}</div>}
+        {!isRule && <div className="tabular shrink-0 text-lg font-semibold">{formatMoney(p.amountCents, currency)}</div>}
       </div>
-      {isRule && p.description && <p className="mt-1.5 whitespace-pre-line text-sm text-ink/80">{p.description}</p>}
-      {p.recipients.length > 0 && (
-        <div className="mt-1.5 text-sm text-muted">
-          To {p.recipients.map((r) => `${r.name} (${formatMoney(r.amountCents, currency)})`).join(', ')}
+
+      {isRule ? (
+        p.description && <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink/80">{p.description}</p>
+      ) : (
+        <div className="mt-3">
+          <div className="text-xs text-muted">{p.requestedBy ?? 'Someone'} wants to pay, from the group&apos;s account:</div>
+          <ul className="mt-1.5 grid gap-1 text-sm">
+            {p.recipients.map((r) => (
+              <li key={r.receiver} className="flex justify-between gap-3">
+                <span className="truncate">{r.name}</span>
+                <span className="tabular text-muted">{formatMoney(r.amountCents, currency)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
+
       {p.flags.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {p.flags.map((f) => (
-            <span key={f} className="pill pill-amber !h-[20px] !text-[11px]">
-              <AlertTriangle size={11} /> {f}
-            </span>
-          ))}
+        <div className="mt-3 flex items-start gap-1.5 text-xs text-amber">
+          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+          <span>{p.flags.join(' · ')}</span>
         </div>
       )}
+
+      <div className="mt-3 flex items-center gap-2 text-xs text-muted">
+        <span className="flex gap-1">
+          {Array.from({ length: p.required }, (_, i) => (
+            <span key={i} className={`h-1.5 w-4 rounded-full ${i < p.approvals ? 'bg-accent' : 'bg-line-strong'}`} />
+          ))}
+        </span>
+        {p.approvals} of {p.required} approvals
+      </div>
+
       {done ? (
-        <div className="mt-3 flex items-center gap-1.5 text-sm font-medium text-accent">
+        <div className="mt-4 flex items-center gap-1.5 text-sm font-medium text-accent">
           <Check size={14} strokeWidth={3} /> {done}
         </div>
       ) : (
-        <div className="mt-3 flex justify-end gap-2">
-          <button className="btn btn-ghost !h-8" onClick={() => decide('REJECT')} disabled={pending}>
-            <X size={14} /> Reject
-          </button>
-          <button className="btn btn-primary !h-8 !bg-accent" onClick={() => decide('APPROVE')} disabled={pending}>
-            {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
-            {deciding && !isRule ? 'Approve & pay via PayPal' : 'Approve'}
-          </button>
-        </div>
+        <>
+          {deciding && !isRule && (
+            <p className="mt-4 rounded-lg bg-bg px-3 py-2 text-xs leading-relaxed text-muted">
+              Yours is the final approval. The group&apos;s PayPal account sends {formatMoney(p.amountCents, currency)} to the recipients; nothing comes from your own account.
+            </p>
+          )}
+          <div className="mt-3 flex justify-end gap-2">
+            <button className="btn btn-ghost !h-9" onClick={() => decide('REJECT')} disabled={pending}>
+              Reject
+            </button>
+            <button className="btn btn-primary !h-9 !bg-accent" onClick={() => decide('APPROVE')} disabled={pending}>
+              {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
+              {deciding && !isRule ? 'Approve & release payout' : 'Approve'}
+            </button>
+          </div>
+        </>
       )}
       {error && <div className="mt-2 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
     </div>
