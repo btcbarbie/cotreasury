@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { connection } from 'next/server'
-import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, GraduationCap, HandHeart, Heart, Link2, Plane, Plus, Scale, Send, ShieldCheck, Sparkles, Trophy, UserX, Users } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, GraduationCap, HandHeart, Heart, Link2, Plane, Plus, Scale, Send, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react'
 import { listCollectives, myTreasuryIds } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 
@@ -43,24 +43,37 @@ const PILLARS = [
 
 const PRINCIPLES = [
   {
-    title: 'AI reads, people decide',
-    body: 'The AI Treasurer reads the ledger and drafts requests. Fixed rules do the maths, and a person makes every decision.',
+    title: 'AI Treasurer',
+    tagline: 'The impartial referee.',
+    body: [
+      'The AI checks transactions and treasury activity against the rules, helps people understand the ledger, flags inconsistencies, and answers questions about what happened.',
+      'It cannot approve requests, move money, or rewrite the ledger.',
+    ],
     Icon: Sparkles,
   },
   {
-    title: 'No self-approval',
-    body: 'Whoever asks to spend can never approve it. That includes the admin.',
-    Icon: UserX,
-  },
-  {
-    title: 'PayPal confirms every dollar',
-    body: 'Money only counts once PayPal confirms it with a signed webhook. Nobody types in “paid”.',
-    Icon: BadgeCheck,
-  },
-  {
-    title: 'History you can check',
-    body: 'Every action is sealed to the one before it. If anyone edits the past, the integrity check fails.',
+    title: 'Shared Ledger',
+    tagline: 'One record everyone can check.',
+    body: [
+      'Every contribution, payout, approval, and transaction is recorded with its status and history. Once recorded, financial history isn’t something one person can simply edit behind the scenes.',
+    ],
     Icon: Link2,
+  },
+  {
+    title: 'Collective Rules',
+    tagline: 'Decisions are made by the people authorized to make them.',
+    body: [
+      'Your group decides who can approve payments and how many approvals are required. The AI applies those rules consistently — it doesn’t get to change them.',
+    ],
+    Icon: Scale,
+  },
+  {
+    title: 'PayPal',
+    tagline: 'The money stays and moves through PayPal.',
+    body: [
+      'Approved in or out payments are processed through PayPal and verified before CoTreasury records them. The AI never becomes the person holding or moving the money.',
+    ],
+    Icon: BadgeCheck,
   },
 ]
 
@@ -140,8 +153,11 @@ export default function Home() {
         <div className="flex items-center gap-2 text-sm font-medium text-accent">
           <ShieldCheck size={16} /> Built for trust
         </div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">How CoTreasury keeps everyone honest</h2>
-        <div className="mt-8 grid gap-x-8 gap-y-6 sm:grid-cols-2">
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">AI reads, people decide</h2>
+        <p className="mt-3 max-w-2xl text-muted">
+          CoTreasury separates financial decisions from financial records, so no single person — or the AI — can quietly change what happened.
+        </p>
+        <div className="mt-8 grid gap-x-8 gap-y-8 sm:grid-cols-2">
           {PRINCIPLES.map((p) => (
             <div key={p.title} className="flex gap-4">
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink text-white">
@@ -149,7 +165,12 @@ export default function Home() {
               </span>
               <div>
                 <div className="font-semibold tracking-tight">{p.title}</div>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{p.body}</p>
+                <div className="mt-0.5 text-sm font-medium text-ink">{p.tagline}</div>
+                {p.body.map((line) => (
+                  <p key={line} className="mt-1.5 text-sm leading-relaxed text-muted">
+                    {line}
+                  </p>
+                ))}
               </div>
             </div>
           ))}
