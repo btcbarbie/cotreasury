@@ -41,6 +41,8 @@ model Member {
   name         String
   email        String
   role         String   @default("MEMBER") // "MEMBER" | "APPROVER" | "ADMIN"
+  // Notifications: the activity-log sequence number this member has seen up to.
+  lastSeenSeq  Int      @default(0)
   createdAt    DateTime @default(now())
 
   collective   Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)

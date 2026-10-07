@@ -70,7 +70,14 @@ export function CollectiveTabs(props: {
   // The approver inbox banner links to #requests: open that tab when it's followed.
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if ((e.target as Element | null)?.closest?.('a[href="#requests"]')) setTab('Activity log')
+      const a = (e.target as Element | null)?.closest?.('a[href^="#"]')
+      const target = a?.getAttribute('href')
+      const to: Record<string, Tab> = { '#requests': 'Activity log', '#activity': 'Activity log', '#ledger': 'Ledger' }
+      if (target && to[target]) {
+        e.preventDefault()
+        setTab(to[target])
+        document.getElementById('requests')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
     }
     document.addEventListener('click', onClick)
     return () => document.removeEventListener('click', onClick)

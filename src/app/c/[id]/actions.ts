@@ -233,3 +233,10 @@ export async function checkIntegrity(collectiveId: string) {
   const { verifyChain } = await import('@/lib/audit')
   return verifyChain(collectiveId)
 }
+
+/** The member has seen their notifications up to `seq`; never moves backwards. */
+export async function markNotificationsSeen(collectiveId: string, seq: number) {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer || !Number.isInteger(seq) || seq <= viewer.lastSeenSeq) return
+  await prisma.member.update({ where: { id: viewer.id }, data: { lastSeenSeq: seq } })
+}

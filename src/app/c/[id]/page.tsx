@@ -14,6 +14,8 @@ import { TreasurerPanel } from '@/components/TreasurerPanel'
 import { canApprove } from '@/lib/treasury'
 import { goalProgress } from '@/lib/goals'
 import { getMerchantAccount } from '@/lib/paypal'
+import { unseenFor } from '@/lib/notifications'
+import { NotificationsCard } from '@/components/NotificationsCard'
 
 export default function CollectivePage({ params, searchParams }: PageProps<'/c/[id]'>) {
   return (
@@ -38,6 +40,7 @@ async function CollectiveContent({
   const [view, account] = await Promise.all([getCollectiveView(id), getMerchantAccount()])
   if (!view) notFound()
   const { collective, viewer, treasury } = view
+  const notifications = await unseenFor(collective.id, viewer)
   const cur = collective.currency
 
   // Only PayPal-confirmed money counts: inflow − outflow = current balance.
@@ -112,6 +115,8 @@ async function CollectiveContent({
           </div>
         </div>
       </div>
+
+      <NotificationsCard key={viewer.id} collectiveId={collective.id} items={notifications.items} headSeq={notifications.headSeq} />
 
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s) => (
