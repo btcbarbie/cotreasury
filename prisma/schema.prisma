@@ -19,6 +19,9 @@ model Collective {
   // "SANDBOX_DEMO" = the shared TrustPool sandbox account used for the demo.
   paypalMode  String   @default("SANDBOX_DEMO")
   paypalEmail String?  // the collective's PayPal Business account (display only)
+  // Bank-style "new payee" control: the first payment to a recipient this
+  // collective has never paid needs one extra approval.
+  newPayeeRule Boolean @default(true)
   createdAt   DateTime @default(now())
 
   members     Member[]
@@ -82,6 +85,7 @@ model LedgerEntry {
 model Proposal {
   id                String   @id @default(cuid())
   collectiveId      String
+  kind              String   @default("SPEND") // "SPEND" | "RULE_CHANGE"
   title             String
   description       String?
   amountCents       Int
@@ -91,6 +95,8 @@ model Proposal {
   status            String   @default("PENDING_APPROVAL") // "PENDING_APPROVAL" | "APPROVED" | "EXECUTING" | "COMPLETED" | "REJECTED" | "FAILED"
   proposedById      String?
   aiAssessment      String?  // JSON from the AI Treasurer (advisory only)
+  flags             String?  // JSON [{code, message, extraApproval}] from deterministic risk checks
+  changePayload     String?  // RULE_CHANGE only: JSON of the proposed rules, applied on approval
   paypalBatchId     String?
   createdAt         DateTime @default(now())
 

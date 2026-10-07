@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from './prisma'
 import { computeTreasury, tierFor, canApprove } from './treasury'
 import { formatMoney } from './money'
+import { assessSpend, type Flag } from './governance'
 
 // The AI Treasurer. It can READ the ledger and run deterministic checks, and it
 // can DRAFT a spending request. It cannot approve, submit, change rules or move
@@ -18,6 +19,7 @@ export type DraftRequest = {
   recipients: { name: string; receiver: string; amountCents: number }[]
   amountCents: number
   requiredApprovals: number
+  flags: Flag[]
 }
 
 export type TreasurerReply = {
@@ -84,6 +86,7 @@ How you work:
 - Never guess or compute money figures yourself. Get every number from your tools, and quote them as given.
 - For "can we afford…" questions, call check_affordability with the total in cents, then explain: available now, available after, and how many approvals the group's rules require (and who can give them).
 - You can draft a spending request, but you cannot submit, approve, or change rules. Say so plainly if asked. Approvers decide; PayPal executes; the ledger records.
+- The group runs bank-style dual controls (see other_controls and new_recipient_rule in the treasury state). When a draft carries risk flags, say which ones and why they change the number of approvals.
 - If something is not affordable, say so and suggest what would be (e.g. fewer awards), using check_affordability to confirm.
 - When drafting payouts to named people without emails, use placeholder emails like firstname.lastname@example.com and mention they must be confirmed before submitting.
 - Be brief: 2–5 short sentences, plain language, no headings. Use **bold** sparingly for key figures.`
@@ -121,10 +124,23 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
           approvals_required: `${t.requiredApprovals} of ${approvers.length}`,
         })),
         approvers: approvers.map((a) => a.name),
+        new_recipient_rule: c.newPayeeRule ? 'ON: the first payment to a never-paid recipient needs one extra approval' : 'OFF',
+        other_controls: [
+          'Maker-checker: whoever submits a request cannot approve it',
+          'A requester paying themselves needs one extra approval',
+          'Rule and approver changes must be approved at the strictest tier before they take effect',
+        ],
         member_count: c.members.length,
         open_requests: c.proposals
           .filter((p) => ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(p.status))
-          .map((p) => ({ title: p.title, amount: formatMoney(p.amountCents, cur), status: p.status })),
+          .map((p) => ({
+            kind: p.kind,
+            title: p.title,
+            amount: formatMoney(p.amountCents, cur),
+            status: p.status,
+            approvals: `${p.approvals.filter((a) => a.decision === 'APPROVE').length} of ${p.requiredApprovals}`,
+            risk_flags: p.flags ? (JSON.parse(p.flags) as Flag[]).map((f) => f.message) : [],
+          })),
         recent_ledger: c.entries.slice(0, 8).map((e) => ({
           date: e.createdAt.toISOString().slice(0, 10),
           type: e.type,
@@ -164,22 +180,32 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
       receiver: r.receiver,
       amountCents: Math.round(r.amount_cents),
     }))
-    const amount = recipients.reduce((s, r) => s + r.amountCents, 0)
-    const tier = tierFor(amount, c.tiers)
-    if (amount <= 0) return { result: { error: 'A request needs at least one recipient with an amount.' }, check: 'Draft rejected' }
-    if (amount > treasury.availableCents) {
-      return { result: { error: `Not affordable: ${formatMoney(amount, cur)} exceeds available ${formatMoney(treasury.availableCents, cur)}.` }, check: 'Draft rejected: not affordable' }
+    if (recipients.length === 0 || recipients.some((r) => !(r.amountCents > 0))) {
+      return { result: { error: 'A request needs at least one recipient with an amount.' }, check: 'Draft rejected' }
+    }
+    // Same deterministic assessment the server uses when the request is submitted.
+    const a = await assessSpend(collectiveId, recipients, null)
+    if (!a.affordable) {
+      return { result: { error: `Not affordable: ${formatMoney(a.amountCents, cur)} exceeds available ${formatMoney(a.availableCents, cur)}.` }, check: 'Draft rejected: not affordable' }
     }
     const draft: DraftRequest = {
       title: String(input.title).slice(0, 120),
       description: String(input.description).slice(0, 500),
       recipients,
-      amountCents: amount,
-      requiredApprovals: tier?.requiredApprovals ?? approvers.length,
+      amountCents: a.amountCents,
+      requiredApprovals: a.requiredApprovals,
+      flags: a.flags,
     }
     return {
-      result: { drafted: true, total: formatMoney(amount, cur), approvals_required: draft.requiredApprovals, note: 'Shown to the user to review and submit. Not submitted.' },
-      check: 'Drafted a request for the approvers',
+      result: {
+        drafted: true,
+        total: formatMoney(a.amountCents, cur),
+        approvals_by_amount: `${a.baseApprovals} of ${a.approverCount}`,
+        approvals_required: `${a.requiredApprovals} (after risk controls; the submitter cannot approve their own request)`,
+        risk_flags: a.flags.map((f) => f.message),
+        note: 'Shown to the user to review and submit. Not submitted.',
+      },
+      check: a.flags.length ? `Drafted a request · ${a.flags.length} risk flag${a.flags.length > 1 ? 's' : ''}` : 'Drafted a request for the approvers',
       draft,
     }
   }

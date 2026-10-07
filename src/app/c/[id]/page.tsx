@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Clock, Landmark, Lock, Wallet } from 'lucide-react'
+import { BellRing, ChevronLeft, Clock, Landmark, Lock, Wallet } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
@@ -36,6 +36,13 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
     { label: 'Committed', value: treasury.committedCents + treasury.pendingOutCents, hint: 'Approved, not yet settled', Icon: Lock, tone: 'bg-blue-soft text-blue' },
     { label: 'Awaiting approval', value: treasury.awaitingApprovalCents, hint: 'Requests still being voted on', Icon: Clock, tone: 'bg-amber-soft text-amber' },
   ]
+
+  // Approver inbox: open requests this viewer is allowed to vote on and hasn't yet.
+  const needsMe = canApprove(viewer.role)
+    ? collective.proposals.filter(
+        (p) => p.status === 'PENDING_APPROVAL' && p.proposedById !== viewer.id && !p.approvals.some((a) => a.memberId === viewer.id),
+      ).length
+    : 0
 
   // Deterministic opening brief for the AI Treasurer panel: facts from the ledger, no model call.
   const approverCount = collective.members.filter((m) => canApprove(m.role)).length
@@ -94,6 +101,18 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
         ))}
       </div>
 
+      {needsMe > 0 && (
+        <a
+          href="#requests"
+          className="mt-6 flex items-center justify-between gap-3 rounded-[14px] border border-amber/25 bg-amber-soft px-4 py-3 text-sm text-amber transition hover:border-amber/50"
+        >
+          <span className="flex items-center gap-2 font-medium">
+            <BellRing size={16} /> {needsMe} request{needsMe === 1 ? ' needs' : 's need'} your sign-off
+          </span>
+          <span className="text-xs">Review →</span>
+        </a>
+      )}
+
       <TreasurerPanel collectiveId={collective.id} kind={collective.kind} currency={cur} brief={brief} />
 
       <CollectiveTabs
@@ -115,8 +134,11 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
           counterparty: e.counterparty ?? e.member?.name ?? null,
           paypalRef: e.paypalRef,
         }))}
+        newPayeeRule={collective.newPayeeRule}
         proposals={collective.proposals.map((p) => ({
           id: p.id,
+          kind: p.kind,
+          flags: p.flags ? (JSON.parse(p.flags) as { code: string; message: string; extraApproval: boolean }[]) : [],
           title: p.title,
           description: p.description,
           amountCents: p.amountCents,

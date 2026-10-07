@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { Check, Loader2, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, Check, Loader2, Scale, Sparkles, X } from 'lucide-react'
 import { decideRequest } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
+import { RulesPanel } from './RulesPanel'
 import type { LedgerRow } from './LedgerGrid'
 
 // AG Grid touches window on import; render it client-side only.
@@ -18,6 +19,8 @@ type Member = { id: string; name: string; email: string; role: string }
 type Tier = { minCents: number; maxCents: number | null; requiredApprovals: number }
 type Proposal = {
   id: string
+  kind: string
+  flags: { code: string; message: string; extraApproval: boolean }[]
   title: string
   description: string | null
   amountCents: number
@@ -38,12 +41,21 @@ export function CollectiveTabs(props: {
   currency: string
   viewerId: string
   viewerRole: string
+  newPayeeRule: boolean
   members: Member[]
   tiers: Tier[]
   entries: LedgerRow[]
   proposals: Proposal[]
 }) {
   const [tab, setTab] = useState<Tab>('Requests')
+  // The approver inbox banner links to #requests: open that tab when it's followed.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if ((e.target as Element | null)?.closest?.('a[href="#requests"]')) setTab('Requests')
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [])
   const counts: Partial<Record<Tab, number>> = {
     Requests: props.proposals.filter((p) => p.status === 'PENDING_APPROVAL').length || undefined,
     Ledger: props.entries.length,
@@ -51,7 +63,7 @@ export function CollectiveTabs(props: {
   }
 
   return (
-    <div className="mt-10">
+    <div id="requests" className="mt-10 scroll-mt-20">
       <div className="no-scrollbar flex gap-1 border-b border-line overflow-x-auto">
         {TABS.map((t) => (
           <button
@@ -76,7 +88,17 @@ export function CollectiveTabs(props: {
             <LedgerGrid entries={props.entries} currency={props.currency} />
           </div>
         )}
-        {tab === 'Rules' && <RulesPanel tiers={props.tiers} members={props.members} currency={props.currency} />}
+        {tab === 'Rules' && (
+          <RulesPanel
+            collectiveId={props.collectiveId}
+            tiers={props.tiers}
+            members={props.members}
+            currency={props.currency}
+            newPayeeRule={props.newPayeeRule}
+            viewerRole={props.viewerRole}
+            ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
+          />
+        )}
         {tab === 'Members' && <MembersPanel members={props.members} />}
       </div>
     </div>
@@ -145,7 +167,8 @@ function RequestCard({
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const approvals = p.approvals.filter((a) => a.decision === 'APPROVE').length
-  const s = PROPOSAL_STATUS[p.status] ?? { label: p.status, pill: 'pill-gray' }
+  const isRule = p.kind === 'RULE_CHANGE'
+  const s = isRule && p.status === 'COMPLETED' ? { label: 'Applied', pill: 'pill-green' } : (PROPOSAL_STATUS[p.status] ?? { label: p.status, pill: 'pill-gray' })
   const isApprover = viewerRole === 'APPROVER' || viewerRole === 'ADMIN'
   const isMaker = p.proposedById === viewerId
   const voted = p.approvals.some((a) => a.memberId === viewerId)
@@ -169,16 +192,40 @@ function RequestCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            {isRule && (
+              <span className="pill pill-violet">
+                <Scale size={12} /> Rule change
+              </span>
+            )}
             <span className="font-medium">{p.title}</span>
             <span className={`pill ${s.pill}`}>{s.label}</span>
           </div>
-          {p.description && <p className="mt-1 text-sm text-muted">{p.description}</p>}
+          {p.description &&
+            (isRule ? (
+              <ul className="mt-2 grid gap-1 text-sm text-ink/80">
+                {p.description.split('\n').map((l, i) => (
+                  <li key={i}>• {l}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-muted">{p.description}</p>
+            ))}
           <div className="mt-1 text-xs text-faint">
             Requested by {p.proposedBy ?? 'unknown'} · {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </div>
         </div>
-        <div className="tabular text-xl font-semibold">{formatMoney(p.amountCents, currency)}</div>
+        {!isRule && <div className="tabular text-xl font-semibold">{formatMoney(p.amountCents, currency)}</div>}
       </div>
+
+      {p.flags.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {p.flags.map((f) => (
+            <span key={f.code} className="pill pill-amber" title="Automated risk check">
+              <AlertTriangle size={12} /> {f.message}
+            </span>
+          ))}
+        </div>
+      )}
 
       {p.recipients.length > 0 && (
         <ul className="mt-4 divide-y divide-line rounded-lg bg-bg/70 text-sm">
@@ -227,59 +274,6 @@ function RequestCard({
       </div>
       {note && <div className="mt-3 text-xs text-muted">{note}</div>}
       {error && <div className="mt-3 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
-    </div>
-  )
-}
-
-function RulesPanel({ tiers, members, currency }: { tiers: Tier[]; members: Member[]; currency: string }) {
-  const approvers = members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN')
-  return (
-    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-      <div className="card p-5">
-        <div className="flex items-center gap-2 font-medium">
-          <ShieldCheck size={16} className="text-accent" /> Spending rules
-        </div>
-        <p className="mt-1 text-sm text-muted">
-          Every payout needs this many approvals from the approvers before PayPal is asked to send it. The AI
-          Treasurer cannot approve or change these rules.
-        </p>
-        <div className="mt-4 divide-y divide-line">
-          {tiers.map((t, i) => (
-            <div key={i} className="flex items-center justify-between py-3 text-sm">
-              <span className="tabular">
-                {t.maxCents === null
-                  ? `${formatMoney(t.minCents, currency)} and above`
-                  : t.minCents === 0
-                    ? `Under ${formatMoney(t.maxCents, currency)}`
-                    : `${formatMoney(t.minCents, currency)} – ${formatMoney(t.maxCents, currency)}`}
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="flex gap-1">
-                  {approvers.map((_, j) => (
-                    <span key={j} className={`h-2 w-2 rounded-full ${j < t.requiredApprovals ? 'bg-ink' : 'bg-line-strong'}`} />
-                  ))}
-                </span>
-                <span className="w-24 text-right text-muted">
-                  {t.requiredApprovals} of {approvers.length}
-                </span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="card p-5">
-        <div className="font-medium">Approvers</div>
-        <p className="mt-1 text-sm text-muted">Chosen by the group, not by who contributes most.</p>
-        <div className="mt-4 grid gap-3">
-          {approvers.map((m) => (
-            <div key={m.id} className="flex items-center gap-3">
-              <Avatar name={m.name} />
-              <span className="flex-1 truncate text-sm">{m.name}</span>
-              <RoleBadge role={m.role} />
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { ArrowUp, Check, FileText, Loader2, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowUp, Check, FileText, Loader2, Sparkles, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { submitRequest } from '@/app/c/[id]/actions'
 import type { DraftRequest, TreasurerReply } from '@/lib/treasurer'
@@ -211,6 +211,15 @@ function DraftCard({ collectiveId, draft, currency, onDone }: { collectiveId: st
         </div>
         <div className="tabular shrink-0 text-lg font-semibold">{formatMoney(draft.amountCents, currency)}</div>
       </div>
+      {draft.flags?.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {draft.flags.map((f) => (
+            <span key={f.code} className="pill pill-amber">
+              <AlertTriangle size={12} /> {f.message}
+            </span>
+          ))}
+        </div>
+      )}
       <ul className="mt-3 divide-y divide-line rounded-lg bg-bg/60 text-sm">
         {draft.recipients.map((r, i) => (
           <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
@@ -222,7 +231,7 @@ function DraftCard({ collectiveId, draft, currency, onDone }: { collectiveId: st
         ))}
       </ul>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-xs text-muted">Needs {draft.requiredApprovals} approver sign-offs. You can&apos;t approve your own request.</span>
+        <span className="text-xs text-muted">Needs {draft.requiredApprovals} approver sign-off{draft.requiredApprovals === 1 ? '' : 's'}. You can&apos;t approve your own request.</span>
         <div className="flex gap-2">
           <button className="btn btn-ghost !h-8" onClick={onDone} disabled={pending}>
             <X size={14} /> Discard
