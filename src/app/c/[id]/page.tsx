@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { connection } from 'next/server'
 import Link from 'next/link'
-import { BellRing, ChevronLeft, PartyPopper, Clock, Landmark, Lock, Wallet } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, BellRing, ChevronLeft, PartyPopper, Clock, Landmark } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
@@ -40,10 +40,13 @@ async function CollectiveContent({
   const { collective, viewer, treasury } = view
   const cur = collective.currency
 
+  // Only PayPal-confirmed money counts: inflow − outflow = current balance.
+  const inflow = collective.entries.filter((e) => e.direction === 'IN' && e.status === 'CONFIRMED').reduce((s, e) => s + e.amountCents, 0)
+  const outflow = collective.entries.filter((e) => e.direction === 'OUT' && e.status === 'CONFIRMED').reduce((s, e) => s + e.amountCents, 0)
   const stats = [
-    { label: 'Available to spend', value: treasury.availableCents, hint: 'Balance minus approved and in-flight spending', Icon: Wallet, tone: 'bg-accent-soft text-accent', primary: true },
-    { label: 'Balance', value: treasury.confirmedBalanceCents, hint: 'Confirmed money in the PayPal account', Icon: Landmark, tone: 'bg-teal-soft text-teal' },
-    { label: 'Committed', value: treasury.committedCents + treasury.pendingOutCents, hint: 'Approved, not yet settled', Icon: Lock, tone: 'bg-blue-soft text-blue' },
+    { label: 'Total inflow', value: inflow, sign: '+', hint: 'All money in, confirmed by PayPal', Icon: ArrowDownLeft, tone: 'bg-accent-soft text-accent', valueTone: 'text-accent' },
+    { label: 'Total outflow', value: outflow, sign: '−', hint: 'All money out, confirmed by PayPal', Icon: ArrowUpRight, tone: 'bg-red-soft text-red' },
+    { label: 'Current balance', value: treasury.confirmedBalanceCents, sign: '=', hint: 'Total inflow minus total outflow', Icon: Landmark, tone: 'bg-teal-soft text-teal', primary: true },
     { label: 'Awaiting approval', value: treasury.awaitingApprovalCents, hint: 'Requests still being voted on', Icon: Clock, tone: 'bg-amber-soft text-amber' },
   ]
 
@@ -105,7 +108,8 @@ async function CollectiveContent({
               </span>
               {s.label}
             </div>
-            <div className={`tabular mt-2 font-semibold tracking-tight ${s.primary ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
+            <div className={`tabular mt-2 font-semibold tracking-tight ${s.primary ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} ${s.valueTone ?? ''}`}>
+              {s.sign && s.sign !== '=' && <span className="mr-0.5 text-faint">{s.sign}</span>}
               {formatMoney(s.value, cur)}
             </div>
           </div>
