@@ -6,6 +6,7 @@ import { ArrowDownLeft, ArrowUpRight, BellRing, ChevronLeft, PartyPopper, Clock,
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
+import { HeaderSlot } from '@/components/HeaderSlot'
 import { CollectiveTabs } from '@/components/CollectiveTabs'
 import { ContributeButton } from '@/components/ContributeDialog'
 import { RequestPaymentButton } from '@/components/RequestPaymentButton'
@@ -69,17 +70,17 @@ async function CollectiveContent({
 
   return (
     <>
-      {/* Top bar: back link on the left, demo identity on the right, right under the header. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-          <ChevronLeft size={15} /> All treasuries
-        </Link>
+      {/* Demo identity lives in the site header, top right. */}
+      <HeaderSlot>
         <ViewerSwitcher
           collectiveId={collective.id}
           viewerId={viewer.id}
           members={collective.members.map((m) => ({ id: m.id, name: m.name, role: m.role }))}
         />
-      </div>
+      </HeaderSlot>
+      <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
+        <ChevronLeft size={15} /> All treasuries
+      </Link>
 
       <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">

@@ -24,7 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </span>
               CoTreasury
             </Link>
-            <span className="pill pill-gray">PayPal sandbox</span>
+            <div id="header-slot" className="flex items-center" />
           </div>
         </header>
         <main className="flex-1">{children}</main>

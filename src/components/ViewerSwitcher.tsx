@@ -51,11 +51,11 @@ export function ViewerSwitcher({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`card flex w-full sm:w-auto items-center gap-2.5 py-2 pl-2 pr-3 text-left transition hover:border-line-strong ${pending ? 'opacity-60' : ''}`}
+        className={`card flex items-center gap-2 py-1 pl-1 pr-2.5 text-left transition hover:border-line-strong ${pending ? 'opacity-60' : ''}`}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <Avatar name={viewer.name} />
+        <Avatar name={viewer.name} size={28} />
         <div className="min-w-0">
           <div className="whitespace-nowrap text-sm font-medium leading-tight">{viewer.name}</div>
           <div className="mt-0.5">
@@ -68,7 +68,7 @@ export function ViewerSwitcher({
       {open && (
         <div
           role="listbox"
-          className="card absolute right-0 top-full z-30 mt-2 max-h-80 w-full sm:w-72 overflow-auto p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
+          className="card absolute right-0 top-full z-30 mt-2 max-h-80 w-72 max-w-[calc(100vw-2rem)] overflow-auto p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
         >
           {sorted.map((m) => (
             <button
