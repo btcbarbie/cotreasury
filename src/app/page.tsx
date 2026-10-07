@@ -39,14 +39,6 @@ const PILLARS = [
   },
 ]
 
-const STEPS = [
-  'Create a treasury around a shared purpose.',
-  'Bring contributors together.',
-  'Set the rules.',
-  'Coordinate decisions.',
-  'Move money when the collective approves.',
-]
-
 export default function Home() {
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -84,7 +76,7 @@ export default function Home() {
       </Suspense>
 
       {/* Pillars */}
-      <section className="border-t border-line py-14 sm:py-16">
+      <section id="how-it-works" className="scroll-mt-20 border-t border-line py-14 sm:py-16">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your money. Your rules. Your collective.</h2>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PILLARS.map((p) => (
@@ -96,29 +88,6 @@ export default function Home() {
               <p className="mt-1.5 text-sm leading-relaxed text-muted">{p.body}</p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="scroll-mt-20 border-t border-line py-14 sm:py-16">
-        <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">From collective intent to collective action.</h2>
-            <p className="mt-4 text-lg font-medium tracking-tight">
-              No single person has to be the{' '}
-              <span className="bg-gradient-to-r from-accent to-violet bg-clip-text text-transparent">source of truth.</span>
-            </p>
-          </div>
-          <ol className="grid gap-2.5">
-            {STEPS.map((s, i) => (
-              <li key={s} className="card flex items-center gap-4 px-4 py-3.5">
-                <span className="tabular inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-white">
-                  {i + 1}
-                </span>
-                <span className="text-sm sm:text-base">{s}</span>
-              </li>
-            ))}
-          </ol>
         </div>
       </section>
 
