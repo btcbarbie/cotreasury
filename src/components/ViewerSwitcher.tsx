@@ -46,8 +46,8 @@ export function ViewerSwitcher({
   const sorted = [...members].sort((a, b) => order[a.role] - order[b.role])
 
   return (
-    <div ref={ref} className="relative shrink-0">
-      <div className="label mb-1.5 sm:text-right">Viewing as</div>
+    <div ref={ref} className="relative flex shrink-0 items-center gap-2">
+      <div className="label hidden sm:block">Viewing as</div>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -68,7 +68,7 @@ export function ViewerSwitcher({
       {open && (
         <div
           role="listbox"
-          className="card absolute right-0 z-30 mt-2 max-h-80 w-full sm:w-72 overflow-auto p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
+          className="card absolute right-0 top-full z-30 mt-2 max-h-80 w-full sm:w-72 overflow-auto p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
         >
           {sorted.map((m) => (
             <button

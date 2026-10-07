@@ -204,7 +204,7 @@ function RequestsPanel({
           </span>
           <div className="mt-4 font-medium">No spending requests yet</div>
           <p className="mt-1 max-w-sm text-sm text-muted">
-            Use Request a payment at the top, or ask the AI Treasurer whether the group can afford something and it will draft the request for you.
+            Use Request payout at the top, or ask the AI Treasurer whether the group can afford something and it will draft the request for you.
           </p>
         </div>
       )}

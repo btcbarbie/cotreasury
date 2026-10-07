@@ -66,7 +66,7 @@ export function ContributeButton(props: { collectiveId: string; collectiveName: 
   return (
     <>
       <button className="btn btn-primary" onClick={() => setOpen({ goalId: props.goals[0]?.id ?? null, amountCents: 5000 })}>
-        Contribute
+        Add funds
       </button>
       {open && <ContributeDialog {...props} initialGoalId={open.goalId} initialAmountCents={open.amountCents} onClose={() => setOpen(null)} />}
     </>
@@ -212,7 +212,7 @@ function ContributeDialog({
       <div className="card w-full sm:max-w-md rounded-b-none sm:rounded-b-[14px] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-lg font-semibold tracking-tight">Contribute</div>
+            <div className="text-lg font-semibold tracking-tight">Add funds</div>
             <div className="text-sm text-muted">
               to {collectiveName} as {viewerName}
             </div>

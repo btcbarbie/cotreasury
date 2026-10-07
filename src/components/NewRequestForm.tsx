@@ -45,7 +45,7 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
     <div className="card p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-medium">Request a payment</div>
+          <div className="font-medium">Request payout</div>
           <p className="mt-0.5 text-sm text-muted">Approvers vote on it; the final approval sends it through PayPal Payouts.</p>
         </div>
         <button onClick={onClose} className="text-muted hover:text-ink" aria-label="Close">

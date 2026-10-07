@@ -18,7 +18,7 @@ export function RequestPaymentButton({ collectiveId, currency }: { collectiveId:
   return (
     <>
       <button className="btn btn-ghost" onClick={() => setOpen(true)}>
-        <Send size={14} /> Request a payment
+        <Send size={14} /> Request payout
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-ink/30 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>

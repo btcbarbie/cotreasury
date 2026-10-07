@@ -15,10 +15,7 @@ import { goalProgress } from '@/lib/goals'
 
 export default function CollectivePage({ params, searchParams }: PageProps<'/c/[id]'>) {
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-      <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-        <ChevronLeft size={15} /> All treasuries
-      </Link>
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 pb-8">
       <Suspense fallback={<div className="mt-6 h-64 card animate-pulse" />}>
         <CollectiveContent params={params} searchParams={searchParams} />
       </Suspense>
@@ -72,7 +69,19 @@ async function CollectiveContent({
 
   return (
     <>
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      {/* Top bar: back link on the left, demo identity on the right, right under the header. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
+          <ChevronLeft size={15} /> All treasuries
+        </Link>
+        <ViewerSwitcher
+          collectiveId={collective.id}
+          viewerId={viewer.id}
+          members={collective.members.map((m) => ({ id: m.id, name: m.name, role: m.role }))}
+        />
+      </div>
+
+      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">{collective.name}</h1>
           <p className="mt-1.5 max-w-2xl text-muted">{collective.purpose}</p>
@@ -83,12 +92,7 @@ async function CollectiveContent({
             <span className="text-muted truncate">{collective.paypalEmail}</span>
           </div>
         </div>
-        <div className="flex flex-col gap-3 sm:items-end">
-          <ViewerSwitcher
-            collectiveId={collective.id}
-            viewerId={viewer.id}
-            members={collective.members.map((m) => ({ id: m.id, name: m.name, role: m.role }))}
-          />
+        <div className="flex shrink-0 flex-col gap-3 sm:items-end">
           <div className="flex flex-wrap gap-2 sm:justify-end">
           <RequestPaymentButton collectiveId={collective.id} currency={cur} />
           <ContributeButton
