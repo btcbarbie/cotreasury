@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
+import { connection } from 'next/server'
 import Link from 'next/link'
 import { BellRing, ChevronLeft, PartyPopper, Clock, Landmark, Lock, Wallet } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
@@ -31,6 +32,7 @@ async function CollectiveContent({
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await connection() // live treasury data and today's date: always render per request
   const { id } = await params
   const justCreated = (await searchParams).created === '1'
   const view = await getCollectiveView(id)

@@ -40,7 +40,7 @@ type Proposal = {
   failureReason: string | null
 }
 
-const TABS = ['Overview', 'Needs attention', 'Requests', 'Ledger', 'Activity', 'Rules', 'Members'] as const
+const TABS = ['Overview', 'Request funds', 'Ledger', 'People & rules'] as const
 type Tab = (typeof TABS)[number]
 
 export function CollectiveTabs(props: {
@@ -69,17 +69,16 @@ export function CollectiveTabs(props: {
   // The approver inbox banner links to #requests: open that tab when it's followed.
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if ((e.target as Element | null)?.closest?.('a[href="#requests"]')) setTab('Requests')
+      if ((e.target as Element | null)?.closest?.('a[href="#requests"]')) setTab('Request funds')
     }
     document.addEventListener('click', onClick)
     return () => document.removeEventListener('click', onClick)
   }, [])
   const counts: Partial<Record<Tab, number>> = {
-    'Needs attention': attention.length || undefined,
-    Requests: props.proposals.filter((p) => p.status === 'PENDING_APPROVAL').length || undefined,
-    Activity: props.events.length || undefined,
+    Overview: attention.length || undefined,
+    'Request funds': props.proposals.filter((p) => p.status === 'PENDING_APPROVAL').length || undefined,
     Ledger: props.entries.length,
-    Members: props.members.length,
+    'People & rules': props.members.length,
   }
 
   return (
@@ -101,18 +100,24 @@ export function CollectiveTabs(props: {
 
       <div className="mt-5">
         {tab === 'Overview' && (
-          <OverviewPanel
-            collectiveId={props.collectiveId}
-            currency={props.currency}
-            summary={props.summary}
-            goals={props.goals}
-            canManage={props.viewerRole === 'APPROVER' || props.viewerRole === 'ADMIN'}
-            viewerId={props.viewerId}
-          />
+          <div className="grid gap-10">
+            <OverviewPanel
+              collectiveId={props.collectiveId}
+              currency={props.currency}
+              summary={props.summary}
+              goals={props.goals}
+              canManage={props.viewerRole === 'APPROVER' || props.viewerRole === 'ADMIN'}
+              viewerId={props.viewerId}
+            />
+            <section>
+              <h3 className="mb-3 font-semibold tracking-tight">
+                Needs attention{attention.length > 0 && <span className="tabular ml-2 text-sm font-normal text-muted">{attention.length}</span>}
+              </h3>
+              <AttentionPanel items={attention} onOpenRequests={() => setTab('Request funds')} />
+            </section>
+          </div>
         )}
-        {tab === 'Needs attention' && <AttentionPanel items={attention} onOpenRequests={() => setTab('Requests')} />}
-        {tab === 'Activity' && <ActivityPanel collectiveId={props.collectiveId} events={props.events} />}
-        {tab === 'Requests' && (
+        {tab === 'Request funds' && (
           <RequestsPanel
             collectiveId={props.collectiveId}
             proposals={props.proposals}
@@ -123,22 +128,37 @@ export function CollectiveTabs(props: {
           />
         )}
         {tab === 'Ledger' && (
-          <div className="card overflow-hidden">
-            <LedgerGrid entries={props.entries} currency={props.currency} />
+          <div className="grid gap-10">
+            <div className="card overflow-hidden">
+              <LedgerGrid entries={props.entries} currency={props.currency} />
+            </div>
+            <section>
+              <h3 className="mb-3 font-semibold tracking-tight">
+                Activity log<span className="tabular ml-2 text-sm font-normal text-muted">{props.events.length}</span>
+              </h3>
+              <ActivityPanel collectiveId={props.collectiveId} events={props.events} />
+            </section>
           </div>
         )}
-        {tab === 'Rules' && (
-          <RulesPanel
-            collectiveId={props.collectiveId}
-            tiers={props.tiers}
-            members={props.members}
-            currency={props.currency}
-            newPayeeRule={props.newPayeeRule}
-            viewerRole={props.viewerRole}
-            ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
-          />
+        {tab === 'People & rules' && (
+          <div className="grid gap-10">
+            <RulesPanel
+              collectiveId={props.collectiveId}
+              tiers={props.tiers}
+              members={props.members}
+              currency={props.currency}
+              newPayeeRule={props.newPayeeRule}
+              viewerRole={props.viewerRole}
+              ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
+            />
+            <section>
+              <h3 className="mb-3 font-semibold tracking-tight">
+                Members<span className="tabular ml-2 text-sm font-normal text-muted">{props.members.length}</span>
+              </h3>
+              <MembersPanel members={props.members} />
+            </section>
+          </div>
         )}
-        {tab === 'Members' && <MembersPanel members={props.members} />}
       </div>
     </div>
   )

@@ -194,7 +194,7 @@ function DraftCard({ collectiveId, draft, currency, onDone }: { collectiveId: st
   if (submitted) {
     return (
       <div className="mt-2 flex items-center gap-2 rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">
-        <Check size={15} strokeWidth={3} /> Submitted. It&apos;s now in Requests, waiting for {draft.requiredApprovals} approval
+        <Check size={15} strokeWidth={3} /> Submitted. It&apos;s now in Request funds, waiting for {draft.requiredApprovals} approval
         {draft.requiredApprovals === 1 ? '' : 's'}.
       </div>
     )
