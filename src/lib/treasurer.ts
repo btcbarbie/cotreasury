@@ -5,6 +5,7 @@ import { formatMoney } from './money'
 import { assessSpend, type Flag } from './governance'
 import { goalProgress } from './goals'
 import type { ReceiverType } from './recipients'
+import { EXIT_POLICIES, exitPolicyLabel, fairShares } from './exitPolicy'
 
 // The AI Treasurer. It can READ the ledger and run deterministic checks, and it
 // can DRAFT a spending request. It cannot approve, submit, change rules or move
@@ -115,6 +116,8 @@ How you work:
 - You are talking to the member described in "you_are" in the treasury state. "I", "me" and "my" mean them.
 - To help someone add funds: work out which goal and how much (their outstanding amount is in you_are.owes), confirm if unclear, then call prepare_contribution. They pay in PayPal themselves.
 - To help someone request a payout: you need who is being paid, their PayPal email, the amount, and what it's for. Ask for whatever is missing, one short question at a time, then call check_affordability and draft_spending_request.
+- Leaving and closing follow the group's exit_policy (in the treasury state). For "what if I leave?" or "what happens if we close?", quote the figures in leaving_and_closing exactly. CoTreasury calculates them from the ledger; you explain them. Members leave, and propose closing, from Settings → Leaving & closing; you can't do either for them.
+- If treasury_status is not OPEN, say that money can't move right now and why.
 - Be brief: 2–5 short sentences, plain language, no headings. Use **bold** sparingly for key figures.`
 
 async function loadState(collectiveId: string) {
@@ -158,6 +161,23 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
           'Rule and approver changes must be approved at the strictest tier before they take effect',
         ],
         member_count: c.members.length,
+        treasury_status: c.status === 'OPEN' && c.proposals.some((p) => p.kind === 'CLOSE' && p.status === 'PENDING_APPROVAL') ? 'OPEN, but the group is voting on closing it (new contributions and requests are paused)' : c.status,
+        leaving_and_closing: {
+          exit_policy: `${exitPolicyLabel(c.exitPolicy)}: ${EXIT_POLICIES.find((p) => p.id === c.exitPolicy)?.hint ?? ''}`,
+          // What each member would get back if they left now (refunds still need the group's approval).
+          if_they_left_now: fairShares(c.members, c.entries, treasury.availableCents).map((s) => ({
+            name: s.name,
+            put_in: formatMoney(s.contributedCents, cur, { cents: true }),
+            would_get_back:
+              c.exitPolicy === 'NO_REFUNDS'
+                ? formatMoney(0, cur) + ' (no refunds)'
+                : c.exitPolicy === 'VOTE'
+                  ? `up to ${formatMoney(Math.min(s.contributedCents, treasury.availableCents), cur, { cents: true })} if the group agrees; proportional share ${formatMoney(s.shareCents, cur, { cents: true })}`
+                  : formatMoney(s.shareCents, cur, { cents: true }),
+          })),
+          closing_needs_approvals: Math.max(1, ...c.tiers.map((t) => t.requiredApprovals)),
+          admin_can_leave: false,
+        },
         you_are: viewer
           ? {
               name: viewer.name,

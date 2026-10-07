@@ -26,7 +26,7 @@ async function Invite({ params }: { params: Promise<{ code: string }> }) {
   await connection()
   const { code } = await params
   const c = await prisma.collective.findFirst({
-    where: { inviteCode: code },
+    where: { inviteCode: code, status: 'OPEN' },
     select: { name: true, purpose: true, members: { where: { role: { not: 'FORMER' } }, select: { role: true } } },
   })
   if (!c) {

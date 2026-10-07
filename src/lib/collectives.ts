@@ -32,6 +32,7 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
     name: c.name,
     purpose: c.purpose,
     kind: c.kind,
+    status: c.status,
     currency: c.currency,
     memberCount: c._count.members,
     eventCount: c._count.events,

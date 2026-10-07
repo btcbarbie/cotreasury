@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { canApprove, computeTreasury, tierFor } from './treasury'
 import { formatMoney } from './money'
+import { EXIT_POLICIES, exitPolicyLabel, type ExitPolicy } from './exitPolicy'
 
 // Bank-style dual-control rules, all deterministic. The AI Treasurer reads
 // these results and explains them; it never decides them.
@@ -20,6 +21,7 @@ export type RulesPayload = {
   newPayeeRule: boolean
   approvalMode?: ApprovalMode
   removeMemberIds?: string[]
+  exitPolicy?: ExitPolicy
 }
 
 type Recipient = { name: string; receiver: string; amountCents: number }
@@ -45,7 +47,12 @@ function maxReachable(approverIds: string[], makerId: string | null) {
   return approverIds.filter((id) => id !== makerId).length
 }
 
-export async function assessSpend(collectiveId: string, recipients: Recipient[], makerId: string | null) {
+/**
+ * `refund`: a payout to a member who is leaving, sized by the exit policy. The
+ * person is known and the amount comes from the policy, so the new-recipient
+ * and self-payment extras don't apply; the normal amount tier still does.
+ */
+export async function assessSpend(collectiveId: string, recipients: Recipient[], makerId: string | null, opts: { refund?: boolean } = {}) {
   const c = await loadCollective(collectiveId)
   const treasury = computeTreasury(c.entries, c.proposals)
   const approverIds = c.members.filter((m) => canApprove(m.role)).map((m) => m.id)
@@ -62,7 +69,7 @@ export async function assessSpend(collectiveId: string, recipients: Recipient[],
 
   const flags: Flag[] = []
   const newPayees = recipients.filter((r) => !known.has(r.receiver.trim().toLowerCase()))
-  if (newPayees.length > 0) {
+  if (newPayees.length > 0 && !opts.refund) {
     flags.push({
       code: 'NEW_PAYEE',
       // Standard for every treasury: paying someone new always needs one extra approval.
@@ -71,7 +78,7 @@ export async function assessSpend(collectiveId: string, recipients: Recipient[],
     })
   }
   const self = recipients.find((r) => memberByEmail.get(r.receiver.trim().toLowerCase())?.id === makerId)
-  if (self) flags.push({ code: 'SELF_PAYMENT', message: 'The requester is paying themselves (+1 approval)', extraApproval: true })
+  if (self && !opts.refund) flags.push({ code: 'SELF_PAYMENT', message: 'The requester is paying themselves (+1 approval)', extraApproval: true })
   const paysMember = recipients.filter((r) => {
     const m = memberByEmail.get(r.receiver.trim().toLowerCase())
     return m && m.id !== makerId
@@ -109,6 +116,7 @@ export async function ruleChangeApprovals(collectiveId: string, makerId: string)
 /** Validate a proposed rule set. Returns an error message, or null if it's sound. */
 export function validateRules(rules: RulesPayload, memberIds: Set<string>): string | null {
   if (rules.approvalMode && !['FIXED', 'RANDOM', 'MIXED'].includes(rules.approvalMode)) return 'Unknown approval mode.'
+  if (rules.exitPolicy && !EXIT_POLICIES.some((p) => p.id === rules.exitPolicy)) return 'Unknown exit policy.'
   if ((rules.removeMemberIds ?? []).some((id) => rules.approverIds.includes(id))) return 'Remove someone from the approvers before removing them from the group.'
   if (rules.approverIds.length < 2) return 'Keep at least two approvers so no one can approve alone.'
   if (rules.approverIds.some((id) => !memberIds.has(id))) return 'Approvers must be members of the group.'
@@ -147,6 +155,9 @@ export function describeRuleChange(current: RulesPayload, next: RulesPayload, na
   const fromMode = current.approvalMode ?? 'FIXED'
   const toMode = next.approvalMode ?? fromMode
   if (fromMode !== toMode) lines.push(`Who reviews payouts: ${APPROVAL_MODE_LABEL[fromMode]} → ${APPROVAL_MODE_LABEL[toMode]}`)
+  const fromExit = current.exitPolicy ?? 'VOTE'
+  const toExit = next.exitPolicy ?? fromExit
+  if (fromExit !== toExit) lines.push(`If someone leaves or the group closes: ${exitPolicyLabel(fromExit)} → ${exitPolicyLabel(toExit)}`)
   if (next.removeMemberIds?.length) lines.push(`Remove from the group: ${next.removeMemberIds.map((id) => names.get(id)).join(', ')}`)
   return lines
 }

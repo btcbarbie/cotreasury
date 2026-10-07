@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { connection } from 'next/server'
 import Link from 'next/link'
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark } from 'lucide-react'
+import { Archive, ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
@@ -17,6 +17,9 @@ import { getMerchantAccount } from '@/lib/paypal'
 import { unseenFor } from '@/lib/notifications'
 import { NotificationsCard } from '@/components/NotificationsCard'
 import { ApprovalsPill } from '@/components/ApprovalsPill'
+import { treasuryLock } from '@/lib/exit'
+import { fairShares } from '@/lib/exitPolicy'
+import type { ExitInfo } from '@/components/ExitPanel'
 
 export default function CollectivePage({ params, searchParams }: PageProps<'/c/[id]'>) {
   return (
@@ -44,6 +47,20 @@ async function CollectiveContent({
   if (!view) notFound()
   const { collective, viewer, treasury } = view
   const notifications = await unseenFor(collective.id, viewer)
+  const lock = await treasuryLock(collective.id)
+  const closeVote = collective.proposals.some((p) => p.kind === 'CLOSE' && p.status === 'PENDING_APPROVAL')
+  const myShare = fairShares(collective.members, collective.entries, treasury.availableCents).find((s) => s.memberId === viewer.id)
+  const exit: ExitInfo = {
+    policy: collective.exitPolicy,
+    status: collective.status,
+    lock,
+    availableCents: treasury.availableCents,
+    strictestApprovals: Math.max(1, ...collective.tiers.map((t) => t.requiredApprovals)),
+    openPayouts: collective.proposals.filter((p) => ['SPEND', 'REFUND'].includes(p.kind) && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(p.status)).length,
+    rulePending: collective.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL'),
+    me: { contributedCents: myShare?.contributedCents ?? 0, shareCents: myShare?.shareCents ?? 0 },
+    closeShares: fairShares(collective.members, collective.entries, treasury.availableCents, true).map(({ memberId, name, contributedCents, shareCents }) => ({ memberId, name, contributedCents, shareCents })),
+  }
   const cur = collective.currency
 
   // Only PayPal-confirmed money counts: inflow − outflow = current balance.
@@ -126,6 +143,8 @@ async function CollectiveContent({
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:items-end">
+          {/* Closed, closing or voting on closing: money can't move, so no buttons that would move it. */}
+          {!lock && (
           <div className="flex flex-wrap gap-2 sm:justify-end">
           <RequestPaymentButton collectiveId={collective.id} currency={cur} />
           <ContributeButton
@@ -137,6 +156,7 @@ async function CollectiveContent({
             goals={collective.goals.map((g) => ({ id: g.id, title: g.title }))}
           />
           </div>
+          )}
         </div>
       </div>
 
@@ -164,6 +184,21 @@ async function CollectiveContent({
         </div>
       )}
 
+      {lock && (
+        <div className={`mt-6 flex items-start gap-3 rounded-[14px] border px-4 py-3 text-sm ${collective.status === 'CLOSED' ? 'border-line bg-bg text-muted' : 'border-red/25 bg-red-soft text-red'}`}>
+          <Archive size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <div className="font-medium">
+              {collective.status === 'CLOSED'
+                ? `Closed${collective.closedAt ? ` on ${collective.closedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`
+                : collective.status === 'CLOSING'
+                  ? 'Closing: paying out the final settlement'
+                  : 'The group is voting on closing this treasury'}
+            </div>
+            <div className="opacity-80">{closeVote ? 'New contributions and requests are paused until the vote is decided. The proposal is in Needs attention below.' : lock}</div>
+          </div>
+        </div>
+      )}
       {justJoined && (
         <div className="mt-6 flex items-start gap-3 rounded-[14px] border border-accent/25 bg-accent-soft px-4 py-3 text-sm text-accent">
           <PartyPopper size={18} className="mt-0.5 shrink-0" />
@@ -199,6 +234,8 @@ async function CollectiveContent({
         currency={cur}
         viewerId={viewer.id}
         viewerRole={viewer.role}
+        exit={exit}
+        exitPolicy={collective.exitPolicy}
         inviteCode={viewer.role === 'ADMIN' ? collective.inviteCode : null}
         members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role }))}
         tiers={collective.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals }))}

@@ -5,14 +5,16 @@ import { cookies } from 'next/headers'
 import { refresh } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getViewer, viewerCookieName } from '@/lib/collectives'
-import { canApprove } from '@/lib/treasury'
+import { canApprove, computeTreasury } from '@/lib/treasury'
 import { assessSpend, describeRuleChange, ruleChangeApprovals, validateRules, type RulesPayload } from '@/lib/governance'
 import type { DraftRequest } from '@/lib/treasurer'
-import { executePayout, retryPayout } from '@/lib/payouts'
+import { executePayout, PAYOUT_KINDS, retryPayout } from '@/lib/payouts'
 import { drawPanel, revealPanel, REVIEW_WINDOW_HOURS } from '@/lib/panel'
 import { closeRejected, votersLeft } from '@/lib/voting'
 import { recordEvent } from '@/lib/audit'
 import { admitMember } from '@/lib/members'
+import { markClosed, openPayoutCount, treasuryLock } from '@/lib/exit'
+import { fairShares, type ExitPolicy } from '@/lib/exitPolicy'
 import { normalizeReceiver, type ReceiverType } from '@/lib/recipients'
 import { formatMoney } from '@/lib/money'
 
@@ -41,7 +43,7 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
   const viewer = await getViewer(collectiveId)
   if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
 
-  const recipients: { name: string; receiver: string; receiverType: ReceiverType; amountCents: number }[] = []
+  const recipients: NewRecipient[] = []
   for (const r of draft.recipients ?? []) {
     if (!r.name || !r.receiver || !Number.isInteger(r.amountCents) || r.amountCents <= 0) continue
     const receiverType: ReceiverType = r.receiverType === 'PHONE' ? 'PHONE' : 'EMAIL'
@@ -51,7 +53,27 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
   }
   if (recipients.length === 0) return { ok: false, error: 'Add at least one recipient.' }
 
-  const a = await assessSpend(collectiveId, recipients, viewer.id)
+  const r = await createPayoutProposal(collectiveId, viewer, { kind: 'SPEND', title: draft.title, description: draft.description, recipients })
+  if (!r.ok) return r
+  refresh()
+  return { ok: true }
+}
+
+type NewRecipient = { name: string; receiver: string; receiverType: ReceiverType; amountCents: number }
+
+/**
+ * Create a payout request (spending or a leaving member's refund): amount,
+ * affordability and approvals come from the ledger and rules, and a hidden
+ * review panel is drawn when the group uses one.
+ */
+async function createPayoutProposal(
+  collectiveId: string,
+  maker: { id: string; name: string },
+  input: { kind: 'SPEND' | 'REFUND'; title: string; description?: string | null; recipients: NewRecipient[] },
+): Promise<Result> {
+  const locked = await treasuryLock(collectiveId)
+  if (locked) return { ok: false, error: locked }
+  const a = await assessSpend(collectiveId, input.recipients, maker.id, { refund: input.kind === 'REFUND' })
   if (!a.affordable) return { ok: false, error: 'This would exceed the money available to spend.' }
 
   const collective = await prisma.collective.findUniqueOrThrow({
@@ -60,33 +82,158 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
   })
   await prisma.$transaction(async (tx) => {
     const p = await tx.proposal.create({
-    data: {
-      collectiveId,
-      kind: 'SPEND',
-      title: String(draft.title).slice(0, 120),
-      description: String(draft.description ?? '').slice(0, 500),
-      amountCents: a.amountCents,
-      requiredApprovals: a.requiredApprovals,
-      proposedById: viewer.id,
-      aiAssessment: JSON.stringify({ draftedByAI: true }),
-      flags: JSON.stringify(a.flags),
-      recipients: { create: recipients },
-    },
-  })
+      data: {
+        collectiveId,
+        kind: input.kind,
+        title: String(input.title).slice(0, 120),
+        description: String(input.description ?? '').slice(0, 500),
+        amountCents: a.amountCents,
+        requiredApprovals: a.requiredApprovals,
+        proposedById: maker.id,
+        aiAssessment: JSON.stringify({ draftedByAI: input.kind === 'SPEND' }),
+        flags: JSON.stringify(a.flags),
+        recipients: { create: input.recipients },
+      },
+    })
     const panel = collective.approvalMode !== 'FIXED'
     await recordEvent(
       collectiveId,
       {
-        actor: viewer.name,
+        actor: maker.name,
         action: 'REQUEST_CREATED',
-        summary: `requested ${formatMoney(a.amountCents, a.currency)} for "${p.title}" (needs ${a.requiredApprovals} approval${a.requiredApprovals === 1 ? '' : 's'}${panel ? ' from a hidden review panel' : ''})`,
-        data: { proposalId: p.id, amountCents: a.amountCents, recipients: recipients.map((r) => r.receiver), flags: a.flags.map((f) => f.code) },
+        summary: `${input.kind === 'REFUND' ? 'asked for a refund of' : 'requested'} ${formatMoney(a.amountCents, a.currency)} for "${p.title}" (needs ${a.requiredApprovals} approval${a.requiredApprovals === 1 ? '' : 's'}${panel ? ' from a hidden review panel' : ''})`,
+        data: { proposalId: p.id, kind: input.kind, amountCents: a.amountCents, recipients: input.recipients.map((r) => r.receiver), flags: a.flags.map((f) => f.code) },
       },
       tx,
     )
     // Random / mixed review: draw the hidden panel with the request.
     if (panel) await drawPanel(tx, p, collective.members, collective.approvalMode)
-    return p
+  })
+  return { ok: true }
+}
+
+/**
+ * Leave the group. Nobody can be made to stay, so this needs no vote. Any
+ * refund follows the group's exit policy and is approved like any payout.
+ */
+export async function leaveTreasury(collectiveId: string, input: { refundCents?: number } = {}): Promise<Result> {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
+  if (viewer.role === 'ADMIN') return { ok: false, error: 'The admin can’t leave. To end the group, propose closing the treasury.' }
+  const locked = await treasuryLock(collectiveId)
+  if (locked) return { ok: false, error: locked }
+  const c = await prisma.collective.findUniqueOrThrow({
+    where: { id: collectiveId },
+    include: { members: { where: { role: { not: 'FORMER' } } }, tiers: true, entries: true, proposals: true },
+  })
+  if (c.proposals.some((p) => p.proposedById === viewer.id && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(p.status))) {
+    return { ok: false, error: 'You have a request still open. Wait for it to finish before you leave.' }
+  }
+  if (canApprove(viewer.role)) {
+    const needed = Math.max(2, ...c.tiers.map((t) => t.requiredApprovals))
+    const left = c.members.filter((m) => canApprove(m.role) && m.id !== viewer.id).length
+    if (left < needed) return { ok: false, error: `The rules need ${needed} approvers. Ask the group to add another approver before you leave.` }
+  }
+
+  const available = computeTreasury(c.entries, c.proposals).availableCents
+  const mine = fairShares(c.members, c.entries, available).find((s) => s.memberId === viewer.id)!
+  const policy = c.exitPolicy as ExitPolicy
+  const refundCents =
+    policy === 'UNSPENT_SHARE'
+      ? mine.shareCents
+      : policy === 'VOTE'
+        ? Math.max(0, Math.min(Math.round(input.refundCents ?? mine.shareCents), mine.contributedCents, available))
+        : 0
+
+  await prisma.$transaction(async (tx) => {
+    await tx.member.update({ where: { id: viewer.id }, data: { role: 'FORMER' } })
+    // Their panel seats are re-drawn the next time anyone opens the treasury.
+    await tx.proposalReviewer.updateMany({ where: { memberId: viewer.id, status: 'ACTIVE' }, data: { expiresAt: new Date() } })
+    await recordEvent(
+      collectiveId,
+      {
+        actor: viewer.name,
+        action: 'MEMBER_LEFT',
+        summary: `left the group${refundCents > 0 ? `; a ${formatMoney(refundCents, c.currency, { cents: true })} refund goes to the group for approval` : policy === 'NO_REFUNDS' ? ' (no refunds: contributions stay with the cause)' : ''}`,
+        data: { memberId: viewer.id, policy, refundCents, contributedCents: mine.contributedCents },
+      },
+      tx,
+    )
+  })
+
+  if (refundCents > 0) {
+    const r = await createPayoutProposal(collectiveId, viewer, {
+      kind: 'REFUND',
+      title: `Refund for ${viewer.name} (left the group)`,
+      description:
+        policy === 'UNSPENT_SHARE'
+          ? `${viewer.name} put in ${formatMoney(mine.contributedCents, c.currency)}. Their share of the ${formatMoney(available, c.currency)} left is ${formatMoney(refundCents, c.currency, { cents: true })}, in proportion to what they contributed.`
+          : `${viewer.name} asked for ${formatMoney(refundCents, c.currency, { cents: true })} back. They put in ${formatMoney(mine.contributedCents, c.currency)}; their proportional share of what's left would be ${formatMoney(mine.shareCents, c.currency, { cents: true })}.`,
+      recipients: [{ name: viewer.name, receiver: viewer.email, receiverType: 'EMAIL', amountCents: refundCents }],
+    })
+    if (!r.ok) return r
+  }
+  refresh()
+  return { ok: true }
+}
+
+type ClosePlan = { mode: 'SPLIT' } | { mode: 'SINGLE'; name: string; receiver: string; receiverType: ReceiverType }
+
+/**
+ * Propose closing the treasury with its final settlement. Approved at the
+ * strictest tier; while it's being voted on, new money movements pause.
+ */
+export async function proposeClose(collectiveId: string, plan: ClosePlan): Promise<Result> {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
+  const locked = await treasuryLock(collectiveId)
+  if (locked) return { ok: false, error: locked }
+  if (await openPayoutCount(collectiveId)) return { ok: false, error: 'Finish or reject the open payout requests first, so the final numbers are settled.' }
+  if (await prisma.proposal.count({ where: { collectiveId, kind: 'RULE_CHANGE', status: 'PENDING_APPROVAL' } })) {
+    return { ok: false, error: 'A rule change is waiting for approval. Settle it before proposing to close.' }
+  }
+  const c = await prisma.collective.findUniqueOrThrow({
+    where: { id: collectiveId },
+    include: { members: { where: { role: { not: 'FORMER' } } }, entries: true, proposals: true },
+  })
+  const policy = c.exitPolicy as ExitPolicy
+  if (policy === 'UNSPENT_SHARE' && plan.mode !== 'SPLIT') return { ok: false, error: 'This group refunds unspent shares, so closing splits what’s left by contribution.' }
+  if (policy === 'NO_REFUNDS' && plan.mode !== 'SINGLE') return { ok: false, error: 'This group gives no refunds, so what’s left goes to one recipient you choose.' }
+
+  const available = computeTreasury(c.entries, c.proposals).availableCents
+  let recipients: NewRecipient[] = []
+  let line: string
+  if (plan.mode === 'SPLIT') {
+    recipients = fairShares(c.members, c.entries, available, true)
+      .filter((s) => s.shareCents > 0)
+      .map((s) => ({ name: s.name, receiver: s.email.toLowerCase(), receiverType: 'EMAIL' as const, amountCents: s.shareCents }))
+    line = `Split the ${formatMoney(available, c.currency, { cents: true })} left between members in proportion to what each put in.`
+  } else {
+    const name = String(plan.name ?? '').trim().slice(0, 80)
+    if (!name) return { ok: false, error: 'Who should receive what’s left?' }
+    const checked = normalizeReceiver(plan.receiverType === 'PHONE' ? 'PHONE' : 'EMAIL', String(plan.receiver ?? ''))
+    if (!checked.ok) return { ok: false, error: checked.error }
+    if (available > 0) recipients = [{ name, receiver: checked.receiver, receiverType: plan.receiverType === 'PHONE' ? 'PHONE' : 'EMAIL', amountCents: available }]
+    line = `Send the ${formatMoney(available, c.currency, { cents: true })} left to ${name}.`
+  }
+
+  const proposal = await prisma.proposal.create({
+    data: {
+      collectiveId,
+      kind: 'CLOSE',
+      title: 'Close the treasury',
+      description: `${line}\nAfter the payout, the treasury becomes read-only. The ledger and activity log stay here for the record.`,
+      amountCents: recipients.reduce((s, r) => s + r.amountCents, 0),
+      requiredApprovals: await ruleChangeApprovals(collectiveId, viewer.id),
+      proposedById: viewer.id,
+      recipients: { create: recipients },
+    },
+  })
+  await recordEvent(collectiveId, {
+    actor: viewer.name,
+    action: 'CLOSE_PROPOSED',
+    summary: `proposed closing the treasury. ${line} New contributions and requests are paused during the vote`,
+    data: { proposalId: proposal.id, plan: plan.mode, availableCents: available },
   })
   refresh()
   return { ok: true }
@@ -96,6 +243,8 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
 export async function proposeRuleChange(collectiveId: string, rules: RulesPayload): Promise<Result> {
   const viewer = await getViewer(collectiveId)
   if (!viewer || !canApprove(viewer.role)) return { ok: false, error: 'Only approvers can propose rule changes.' }
+  const locked = await treasuryLock(collectiveId)
+  if (locked) return { ok: false, error: locked }
   const c = await prisma.collective.findUniqueOrThrow({ where: { id: collectiveId }, include: { members: true, tiers: { orderBy: { minCents: 'asc' } }, proposals: true } })
   if (c.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')) {
     return { ok: false, error: 'A rule change is already waiting for approval.' }
@@ -110,6 +259,7 @@ export async function proposeRuleChange(collectiveId: string, rules: RulesPayloa
     approverIds: c.members.filter((m) => canApprove(m.role)).map((m) => m.id),
     newPayeeRule: c.newPayeeRule,
     approvalMode: c.approvalMode as RulesPayload['approvalMode'],
+    exitPolicy: c.exitPolicy as ExitPolicy,
   }
   if ((rules.removeMemberIds ?? []).includes(viewer.id)) return { ok: false, error: 'You can’t propose removing yourself.' }
   if (admin && (rules.removeMemberIds ?? []).includes(admin.id)) return { ok: false, error: 'The admin can’t be removed.' }
@@ -199,11 +349,13 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
         proposal.collectiveId,
         {
           actor: 'CoTreasury',
-          action: proposal.kind === 'RULE_CHANGE' ? 'RULES_CHANGED' : 'REQUEST_APPROVED',
+          action: proposal.kind === 'RULE_CHANGE' ? 'RULES_CHANGED' : proposal.kind === 'CLOSE' ? 'TREASURY_CLOSING' : 'REQUEST_APPROVED',
           summary:
             proposal.kind === 'RULE_CHANGE'
               ? `new spending rules took effect: ${proposal.description?.replace(/\n/g, '; ')}`
-              : `"${proposal.title}" reached ${proposal.requiredApprovals} approval${proposal.requiredApprovals === 1 ? '' : 's'}`,
+              : proposal.kind === 'CLOSE'
+                ? `the group approved closing the treasury (${proposal.requiredApprovals} approval${proposal.requiredApprovals === 1 ? '' : 's'}); paying out the final settlement`
+                : `"${proposal.title}" reached ${proposal.requiredApprovals} approval${proposal.requiredApprovals === 1 ? '' : 's'}`,
           data: { proposalId },
         },
         tx,
@@ -219,7 +371,11 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
       await tx.member.updateMany({ where: { collectiveId: proposal.collectiveId, role: 'MEMBER', id: { in: rules.approverIds } }, data: { role: 'APPROVER' } })
       await tx.collective.update({
         where: { id: proposal.collectiveId },
-        data: { newPayeeRule: rules.newPayeeRule, ...(rules.approvalMode ? { approvalMode: rules.approvalMode } : {}) },
+        data: {
+          newPayeeRule: rules.newPayeeRule,
+          ...(rules.approvalMode ? { approvalMode: rules.approvalMode } : {}),
+          ...(rules.exitPolicy ? { exitPolicy: rules.exitPolicy } : {}),
+        },
       })
       if (rules.removeMemberIds?.length) {
         // Former members keep their history (payments, votes) but can no longer act.
@@ -228,12 +384,22 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
       await tx.proposal.update({ where: { id: proposalId }, data: { status: 'COMPLETED' } })
       return
     }
+    if (status === 'APPROVED' && proposal.kind === 'CLOSE') {
+      await tx.collective.update({ where: { id: proposal.collectiveId }, data: { status: 'CLOSING' } })
+    }
     await tx.proposal.update({ where: { id: proposalId }, data: { status } })
   })
 
   // The collective has decided: the final approval sends the money through PayPal.
-  const after = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { status: true, kind: true } })
-  if (after?.kind === 'SPEND' && after.status === 'APPROVED') {
+  const after = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { status: true, kind: true, collectiveId: true, _count: { select: { recipients: true } } } })
+  if (after?.kind === 'CLOSE' && after.status === 'APPROVED' && after._count.recipients === 0) {
+    // Nothing left to pay out: close straight away.
+    await prisma.proposal.update({ where: { id: proposalId }, data: { status: 'COMPLETED' } })
+    await markClosed(after.collectiveId)
+    refresh()
+    return { ok: true }
+  }
+  if (after && PAYOUT_KINDS.includes(after.kind) && after.status === 'APPROVED') {
     const sent = await executePayout(proposalId)
     refresh()
     return sent.ok ? { ok: true } : { ok: false, error: sent.error ?? 'PayPal payout failed.' }
@@ -253,12 +419,39 @@ export async function retryRequestPayout(proposalId: string): Promise<Result> {
   return r.ok ? { ok: true } : { ok: false, error: r.error ?? 'Retry failed.' }
 }
 
+/**
+ * The final settlement failed and nothing was paid (e.g. PayPal had too little
+ * money): approvers can reopen the treasury instead of leaving it stuck closing.
+ */
+export async function cancelClose(proposalId: string): Promise<Result> {
+  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, include: { recipients: true } })
+  if (!p || p.kind !== 'CLOSE' || p.status !== 'FAILED') return { ok: false, error: 'There is no failed closing to cancel.' }
+  const viewer = await getViewer(p.collectiveId)
+  if (!viewer || !canApprove(viewer.role)) return { ok: false, error: 'Only approvers can cancel closing.' }
+  if (p.recipients.some((r) => r.status === 'SUCCEEDED' || r.status === 'UNCLAIMED')) {
+    return { ok: false, error: 'Part of the settlement was already paid, so the treasury can’t reopen. Retry the rest instead.' }
+  }
+  const { count } = await prisma.collective.updateMany({ where: { id: p.collectiveId, status: 'CLOSING' }, data: { status: 'OPEN' } })
+  if (count === 0) return { ok: false, error: 'This treasury isn’t closing.' }
+  await prisma.proposal.update({ where: { id: p.id }, data: { status: 'REJECTED', failureReason: `${p.failureReason ?? 'The settlement failed.'} Closing was cancelled.` } })
+  await recordEvent(p.collectiveId, {
+    actor: viewer.name,
+    action: 'TREASURY_REOPENED',
+    summary: 'cancelled closing after the final settlement failed (nothing was paid); the treasury is open again',
+    data: { proposalId: p.id },
+  })
+  refresh()
+  return { ok: true }
+}
+
 /** Approvers set what the collective is saving for. Goals don't move money, so no vote is needed. */
 export async function addGoal(
   collectiveId: string,
   input: { title: string; kind: 'TARGET' | 'MONTHLY'; perMemberCents: number; dueDate?: string | null },
 ): Promise<Result> {
   const viewer = await getViewer(collectiveId)
+  const locked = await treasuryLock(collectiveId)
+  if (locked) return { ok: false, error: locked }
   if (!viewer || !canApprove(viewer.role)) return { ok: false, error: 'Only approvers can add goals.' }
   const title = input.title?.trim() ?? ''
   if (title.length < 3 || title.length > 80) return { ok: false, error: 'Give the goal a short name.' }
@@ -325,6 +518,7 @@ export async function updateTreasuryDetails(collectiveId: string, input: { name:
 /** Admin: add a member (contributor). Making someone an approver is a governed rule change. */
 export async function addMember(collectiveId: string, input: { name: string; email: string }): Promise<Result> {
   const viewer = await getViewer(collectiveId)
+  if ((await prisma.collective.findUnique({ where: { id: collectiveId }, select: { status: true } }))?.status !== 'OPEN') return { ok: false, error: 'This treasury is closed to new members.' }
   if (!viewer || viewer.role !== 'ADMIN') return { ok: false, error: 'Only the admin can add members.' }
   const r = await admitMember(collectiveId, input, { actor: viewer.name, action: 'MEMBER_ADDED', summary: (name) => `added ${name} to the group` })
   if (!r.ok) return r

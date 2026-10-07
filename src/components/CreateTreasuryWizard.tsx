@@ -6,6 +6,7 @@ import { createTreasury, type NewTreasury } from '@/app/new/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar } from './ui'
 import { MODES } from './RulesPanel'
+import { EXIT_POLICIES, exitPolicyLabel, type ExitPolicy } from '@/lib/exitPolicy'
 
 const STEPS = ['Purpose', 'People', 'Rules', 'PayPal', 'Review'] as const
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -53,6 +54,7 @@ export function CreateTreasuryWizard() {
   const [preset, setPreset] = useState<'light' | 'balanced' | 'strict'>('balanced')
   const [rows, setRows] = useState<TierRow[] | null>(null)
   const [approvalMode, setApprovalMode] = useState<'FIXED' | 'RANDOM' | 'MIXED'>('FIXED')
+  const [exitPolicy, setExitPolicy] = useState<ExitPolicy>('VOTE')
   const [paypalEmail, setPaypalEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -111,6 +113,7 @@ export function CreateTreasuryWizard() {
       tiers,
       newPayeeRule: true,
       approvalMode,
+      exitPolicy,
       paypalEmail: paypalEmail || creator.email,
     }
     setError(null)
@@ -305,6 +308,18 @@ export function CreateTreasuryWizard() {
                 <p className="text-xs text-amber">With {filled.length + 1} people it&apos;s easy to guess who was drawn. Random panels work best from about 8 members; you can switch later.</p>
               )}
             </div>
+            <div className="mt-5 label">If someone leaves or the group closes</div>
+            <div className="mt-2 grid gap-2">
+              {EXIT_POLICIES.map((p) => (
+                <label key={p.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${exitPolicy === p.id ? 'border-ink bg-bg' : 'border-line'}`}>
+                  <input type="radio" name="exit" checked={exitPolicy === p.id} onChange={() => setExitPolicy(p.id)} className="mt-0.5 accent-[var(--accent)]" />
+                  <span>
+                    <span className="font-medium">{p.label}</span>
+                    <span className="block text-muted">{p.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
             <div className="mt-4 flex items-start gap-2 rounded-xl bg-accent-soft px-3 py-2.5 text-sm text-accent">
               <ShieldCheck size={16} className="mt-0.5 shrink-0" />
               Always on: no one approves their own request, the first payment to a new recipient needs one extra approval, and so does anyone paying themselves.
@@ -381,6 +396,7 @@ export function CreateTreasuryWizard() {
                     </li>
                   ))}
                   <li className="text-muted">Reviewed by: {MODES.find((m) => m.id === approvalMode)?.label}</li>
+                  <li className="text-muted">If someone leaves or the group closes: {exitPolicyLabel(exitPolicy)}</li>
                 </ul>
               </div>
               <div className="flex items-center gap-3 rounded-xl bg-bg p-3.5">

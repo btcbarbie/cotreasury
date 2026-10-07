@@ -5,6 +5,7 @@ import { Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { proposeRuleChange } from '@/app/c/[id]/actions'
 import { Avatar, RoleBadge } from './ui'
+import { EXIT_POLICIES, type ExitPolicy } from '@/lib/exitPolicy'
 
 type Member = { id: string; name: string; email: string; role: string }
 type Tier = { minCents: number; maxCents: number | null; requiredApprovals: number }
@@ -29,6 +30,7 @@ export function RulesPanel({
   members,
   currency,
   approvalMode,
+  exitPolicy,
   viewerRole,
   ruleChangePending,
 }: {
@@ -37,6 +39,7 @@ export function RulesPanel({
   members: Member[]
   currency: string
   approvalMode: string
+  exitPolicy: string
   viewerRole: string
   ruleChangePending: boolean
 }) {
@@ -46,7 +49,7 @@ export function RulesPanel({
 
   if (editing) {
     return (
-      <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} approvalMode={approvalMode} onClose={() => setEditing(false)} />
+      <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} approvalMode={approvalMode} exitPolicy={exitPolicy} onClose={() => setEditing(false)} />
     )
   }
 
@@ -94,6 +97,13 @@ export function RulesPanel({
             </span>
             <span className="pill pill-violet shrink-0">{MODES.find((m) => m.id === approvalMode)?.label}</span>
           </div>
+          <div className="flex items-start justify-between gap-4 py-3 text-sm">
+            <span>
+              If someone leaves or the group closes
+              <span className="block text-xs text-muted">{EXIT_POLICIES.find((p) => p.id === exitPolicy)?.hint}</span>
+            </span>
+            <span className="pill pill-violet shrink-0">{EXIT_POLICIES.find((p) => p.id === exitPolicy)?.label}</span>
+          </div>
         </div>
       </div>
 
@@ -138,15 +148,18 @@ function RulesEditor({
   tiers,
   members,
   approvalMode,
+  exitPolicy,
   onClose,
 }: {
   collectiveId: string
   tiers: Tier[]
   members: Member[]
   approvalMode: string
+  exitPolicy: string
   onClose: () => void
 }) {
   const [mode, setMode] = useState(approvalMode)
+  const [exit, setExit] = useState(exitPolicy as ExitPolicy)
   const [removeIds, setRemoveIds] = useState<string[]>([])
   // Edit tiers as "upper bounds" so ranges always stay contiguous.
   const [rows, setRows] = useState(tiers.map((t) => ({ upTo: t.maxCents === null ? '' : String(t.maxCents / 100), approvals: t.requiredApprovals })))
@@ -173,6 +186,7 @@ function RulesEditor({
         approverIds,
         newPayeeRule: true,
         approvalMode: mode as 'FIXED' | 'RANDOM' | 'MIXED',
+        exitPolicy: exit,
         removeMemberIds: removeIds,
       })
       if (!res.ok) return setError(res.error)
@@ -275,6 +289,19 @@ function RulesEditor({
           <p className="text-xs text-amber">With {members.length} members it&apos;s easy to guess who was drawn. Random panels work best from about 8 members.</p>
         )}
         {mode !== 'FIXED' && <p className="text-xs text-muted">Changes to these rules are still approved by the named approvers.</p>}
+      </div>
+
+      <div className="mt-6 label">If someone leaves or the group closes</div>
+      <div className="mt-2 grid gap-2">
+        {EXIT_POLICIES.map((p) => (
+          <label key={p.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${exit === p.id ? 'border-ink bg-bg' : 'border-line'}`}>
+            <input type="radio" name="exit" checked={exit === p.id} onChange={() => setExit(p.id)} className="mt-0.5 accent-[var(--accent)]" />
+            <span>
+              <span className="font-medium">{p.label}</span>
+              <span className="block text-muted">{p.hint}</span>
+            </span>
+          </label>
+        ))}
       </div>
 
       <div className="mt-6 label">Remove from the group</div>

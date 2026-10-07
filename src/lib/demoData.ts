@@ -27,6 +27,7 @@ type DemoSeed = {
     name: string
     purpose: string
     kind: string
+    exitPolicy: 'NO_REFUNDS' | 'UNSPENT_SHARE' | 'VOTE'
     paypalEmail: string
     domain: string
     members: MemberSeed[]
@@ -44,6 +45,7 @@ async function createCollective(prisma: PrismaClient, data: DemoSeed) {
       name: data.name,
       purpose: data.purpose,
       kind: data.kind,
+      exitPolicy: data.exitPolicy,
       paypalEmail: data.paypalEmail,
       isDemo: true,
       tiers: { create: data.tiers },
@@ -177,6 +179,7 @@ const DEMO_SEEDS: DemoSeed[] = [
     purpose:
       "Help us give Maya a chance to start college without carrying the whole burden herself. Maya has been accepted to Howard University. We're a group of family friends and former classmates putting money together to help cover her first year. Everyone can see what has come in, what's been approved, and what's been paid.",
     kind: 'SCHOLARSHIP_FUND',
+    exitPolicy: 'NO_REFUNDS',
     paypalEmail: 'maya.scholarship@example.com',
     domain: 'friends.example',
     members: [
@@ -221,6 +224,7 @@ const DEMO_SEEDS: DemoSeed[] = [
     purpose:
       "Eight of us. One trip. One place to keep the money together. We're finally doing the trip we've been talking about for years. Everyone is putting in what they can, and we're using this treasury to keep contributions, bookings, and spending in one place.",
     kind: 'GROUP_TRIP',
+    exitPolicy: 'UNSPENT_SHARE',
     paypalEmail: 'lisbon.trip@example.com',
     domain: 'friends.example',
     members: [
@@ -265,6 +269,7 @@ const DEMO_SEEDS: DemoSeed[] = [
     purpose:
       "Long-term partnership. We're building our life together, so we want our finances to work that way too. Both of us can contribute, see what's happening, and make decisions about our shared money without one person having to manage everything alone.",
     kind: 'HOUSEHOLD',
+    exitPolicy: 'VOTE',
     paypalEmail: 'the.johnsons@example.com',
     domain: 'home.example',
     members: [
@@ -309,6 +314,10 @@ export async function createDemoCollectives(prisma: PrismaClient) {
 /** Seed any showcase treasury that's missing; returns the names it created. */
 export async function ensureDemoCollectives(prisma: PrismaClient) {
   const existing = new Set((await prisma.collective.findMany({ where: { isDemo: true }, select: { name: true } })).map((c) => c.name))
+  // Demos still on the default policy (created before exit policies existed) get their story's policy.
+  for (const seed of DEMO_SEEDS) {
+    await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, exitPolicy: 'VOTE', status: 'OPEN' }, data: { exitPolicy: seed.exitPolicy } })
+  }
   const created: string[] = []
   for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.name))) {
     await createCollective(prisma, seed)

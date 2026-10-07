@@ -7,6 +7,7 @@ import { MY_TREASURIES_COOKIE, myTreasuryIds, viewerCookieName } from '@/lib/col
 import { validateRules } from '@/lib/governance'
 import { recordEvent } from '@/lib/audit'
 import { formatMoney } from '@/lib/money'
+import { EXIT_POLICIES, exitPolicyLabel, type ExitPolicy } from '@/lib/exitPolicy'
 
 export type NewTreasury = {
   name: string
@@ -17,6 +18,7 @@ export type NewTreasury = {
   tiers: { minCents: number; maxCents: number | null; requiredApprovals: number }[]
   newPayeeRule: boolean
   approvalMode?: 'FIXED' | 'RANDOM' | 'MIXED'
+  exitPolicy?: ExitPolicy
   paypalEmail: string
 }
 
@@ -61,6 +63,7 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
       paypalEmail,
       newPayeeRule: true, // standard for every treasury
       approvalMode: ['RANDOM', 'MIXED'].includes(input.approvalMode ?? '') ? input.approvalMode! : 'FIXED',
+      exitPolicy: EXIT_POLICIES.some((p) => p.id === input.exitPolicy) ? input.exitPolicy : 'VOTE',
       tiers: { create: tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals })) },
       members: {
         create: [{ name: creator.name, email: creator.email, role: 'ADMIN' }, ...people],
@@ -81,7 +84,7 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
     action: 'RULES_SET',
     summary: `set the spending rules: ${tiers
       .map((t) => `${t.maxCents === null ? `${formatMoney(t.minCents, 'USD')}+` : `${formatMoney(t.minCents, 'USD')}–${formatMoney(t.maxCents, 'USD')}`} needs ${t.requiredApprovals}`)
-      .join('; ')}; +1 for new recipients (standard); payouts reviewed by ${input.approvalMode === 'RANDOM' ? 'a random review panel' : input.approvalMode === 'MIXED' ? 'a mixed panel' : 'the fixed approvers'}`,
+      .join('; ')}; +1 for new recipients (standard); payouts reviewed by ${input.approvalMode === 'RANDOM' ? 'a random review panel' : input.approvalMode === 'MIXED' ? 'a mixed panel' : 'the fixed approvers'}; if someone leaves or the group closes: ${exitPolicyLabel(input.exitPolicy ?? 'VOTE').toLowerCase()}`,
     data: { tiers, newPayeeRule: !!input.newPayeeRule },
   })
 

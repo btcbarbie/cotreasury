@@ -102,7 +102,14 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
       ) : (
         <div className="mt-3">
           {p.panel && <div className="mb-1.5 text-xs font-medium text-violet">You were drawn at random to review this</div>}
-          <div className="text-xs text-muted">{p.requestedBy ?? 'Someone'} wants to pay, from the group&apos;s account:</div>
+          {p.description && p.kind !== 'SPEND' && <p className="mb-2 whitespace-pre-line text-sm leading-relaxed text-ink/80">{p.description}</p>}
+          <div className="text-xs text-muted">
+            {p.kind === 'CLOSE'
+              ? 'Final settlement, paid from the group’s account:'
+              : p.kind === 'REFUND'
+                ? `${p.requestedBy ?? 'A member'} left the group. Refund, from the group’s account:`
+                : `${p.requestedBy ?? 'Someone'} wants to pay, from the group’s account:`}
+          </div>
           <ul className="mt-1.5 grid gap-1 text-sm">
             {p.recipients.map((r) => (
               <li key={r.receiver} className="flex justify-between gap-3">
@@ -145,6 +152,7 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
           {deciding && !isRule && (
             <p className="mt-4 rounded-lg bg-bg px-3 py-2 text-xs leading-relaxed text-muted">
               Yours is the final approval. The group&apos;s PayPal account sends {formatMoney(p.amountCents, currency)} to the recipients; nothing comes from your own account.
+              {p.kind === 'CLOSE' && ' Then the treasury becomes read-only.'}
             </p>
           )}
           <div className="mt-3 flex justify-end gap-2">
@@ -153,7 +161,7 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
             </button>
             <button className="btn btn-primary !h-9 !bg-accent" onClick={() => decide('APPROVE')} disabled={pending}>
               {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
-              {deciding && !isRule ? 'Approve & release payout' : 'Approve'}
+              {deciding && !isRule ? (p.kind === 'CLOSE' ? 'Approve & close treasury' : 'Approve & release payout') : 'Approve'}
             </button>
           </div>
         </>

@@ -31,6 +31,13 @@ model Collective {
   // Shareable invite link (/join/<code>). The admin can reset it, which stops
   // the old link working, or turn it off (null).
   inviteCode  String?  // random 96-bit code; indexed below
+  // What happens to money when someone leaves or the group closes:
+  // "NO_REFUNDS" (gifts to the cause), "UNSPENT_SHARE" (your share of what's
+  // left, by contribution) or "VOTE" (the group decides each case).
+  exitPolicy  String   @default("VOTE")
+  // "OPEN" → "CLOSING" (final settlement being paid) → "CLOSED" (read-only).
+  status      String   @default("OPEN")
+  closedAt    DateTime?
   createdAt   DateTime @default(now())
 
   members     Member[]
@@ -103,7 +110,7 @@ model LedgerEntry {
 model Proposal {
   id                String   @id @default(cuid())
   collectiveId      String
-  kind              String   @default("SPEND") // "SPEND" | "RULE_CHANGE"
+  kind              String   @default("SPEND") // "SPEND" | "RULE_CHANGE" | "REFUND" (to a departing member) | "CLOSE" (final settlement)
   title             String
   description       String?
   amountCents       Int

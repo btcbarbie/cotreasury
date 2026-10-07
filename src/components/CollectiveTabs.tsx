@@ -3,11 +3,12 @@
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { AlertTriangle, Check, Loader2, RotateCcw, Scale, Send, UsersRound, X } from 'lucide-react'
-import { decideRequest, refreshCollective, retryRequestPayout } from '@/app/c/[id]/actions'
+import { decideRequest, refreshCollective, retryRequestPayout, cancelClose } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
 import { AddMemberButton, InviteLinkCard, TreasuryDetailsCard } from './SettingsPanels'
+import { ExitPanel, type ExitInfo } from './ExitPanel'
 import { OverviewPanel } from './OverviewPanel'
 import { CollapsibleSection, MinimizeButton } from './Collapsible'
 import { TreasurerPanel } from './TreasurerPanel'
@@ -58,6 +59,8 @@ export function CollectiveTabs(props: {
   currency: string
   viewerId: string
   viewerRole: string
+  exit: ExitInfo
+  exitPolicy: string
   inviteCode: string | null
   goals: GoalProgress[]
   events: ActivityEvent[]
@@ -193,9 +196,13 @@ export function CollectiveTabs(props: {
                 members={props.members}
                 currency={props.currency}
                 approvalMode={props.approvalMode}
+                exitPolicy={props.exitPolicy}
                 viewerRole={props.viewerRole}
                 ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
               />
+            </CollapsibleSection>
+            <CollapsibleSection title="Leaving & closing">
+              <ExitPanel collectiveId={props.collectiveId} currency={props.currency} viewerRole={props.viewerRole} exit={props.exit} />
             </CollapsibleSection>
           </div>
         )}
@@ -268,6 +275,14 @@ function RequestCard({
     })
   }
 
+  function reopen() {
+    setError(null)
+    start(async () => {
+      const r = await cancelClose(p.id)
+      if (!r.ok) setError(r.error)
+    })
+  }
+
   const approvals = p.approvals.filter((a) => a.decision === 'APPROVE').length
   const rejections = p.approvals.length - approvals
   const isRule = p.kind === 'RULE_CHANGE'
@@ -322,6 +337,8 @@ function RequestCard({
                 <Scale size={12} /> Rule change
               </span>
             )}
+            {p.kind === 'REFUND' && <span className="pill pill-amber">Refund</span>}
+            {p.kind === 'CLOSE' && <span className="pill pill-red">Close treasury</span>}
             <span className="font-medium">{p.title}</span>
             <span className={`pill ${s.pill}`}>{s.label}</span>
           </div>
@@ -339,7 +356,7 @@ function RequestCard({
                 ))}
               </ul>
             ) : (
-              <p className="mt-1 text-sm text-muted">{p.description}</p>
+              <p className="mt-1 whitespace-pre-line text-sm text-muted">{p.description}</p>
             ))}
           {expanded && (
             <div className="mt-1 text-xs text-faint">
@@ -403,9 +420,16 @@ function RequestCard({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">
           <span>{p.failureReason ?? 'The payout failed.'}</span>
           {isApprover && !p.recipients.some((r) => r.status === 'SUCCEEDED' || r.status === 'UNCLAIMED') && (
-            <button className="btn btn-ghost !h-7 !text-xs" onClick={retry} disabled={pending}>
-              <RotateCcw size={12} /> Retry payout
-            </button>
+            <span className="flex gap-2">
+              {p.kind === 'CLOSE' && (
+                <button className="btn btn-ghost !h-7 !text-xs" onClick={reopen} disabled={pending}>
+                  Cancel closing
+                </button>
+              )}
+              <button className="btn btn-ghost !h-7 !text-xs" onClick={retry} disabled={pending}>
+                <RotateCcw size={12} /> Retry payout
+              </button>
+            </span>
           )}
         </div>
       )}
@@ -445,7 +469,7 @@ function RequestCard({
             </button>
             <button className="btn btn-primary !h-8 !bg-accent" onClick={() => decide('APPROVE')} disabled={pending}>
               {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}{' '}
-              {!isRule && !p.wontPass && approvals + 1 >= p.requiredApprovals ? 'Approve & release payout' : 'Approve'}
+              {!isRule && !p.wontPass && approvals + 1 >= p.requiredApprovals ? (p.kind === 'CLOSE' ? 'Approve & close treasury' : 'Approve & release payout') : 'Approve'}
             </button>
           </div>
         )}

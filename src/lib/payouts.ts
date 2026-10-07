@@ -4,6 +4,10 @@ import { formatMoney } from './money'
 import { createPayoutBatch, getPayoutBatch, PayPalError, type PayoutItem } from './paypal'
 import { recordEvent } from './audit'
 import { receiverLabel } from './recipients'
+import { markClosed } from './exit'
+
+/** Proposals that pay people through PayPal Payouts. */
+export const PAYOUT_KINDS = ['SPEND', 'REFUND', 'CLOSE']
 
 // Approved spending → PayPal Payouts. The only code path that moves money out.
 // Recipient and ledger state change only from PayPal's own answers: the batch
@@ -30,7 +34,7 @@ const OUTCOME: Record<string, ItemOutcome> = {
  */
 export async function executePayout(proposalId: string): Promise<{ ok: boolean; error?: string }> {
   const claimed = await prisma.proposal.updateMany({
-    where: { id: proposalId, kind: 'SPEND', status: 'APPROVED' },
+    where: { id: proposalId, kind: { in: PAYOUT_KINDS }, status: 'APPROVED' },
     data: { status: 'EXECUTING', executedAt: new Date(), failureReason: null, payoutAttempts: { increment: 1 } },
   })
   if (claimed.count === 0) return { ok: false, error: 'This request is not ready to pay out.' }
@@ -163,6 +167,7 @@ async function finalize(proposalId: string) {
   if (!p || p.status !== 'EXECUTING') return
   if (p.recipients.some((r) => r.status === 'SENT' || r.status === 'PENDING')) return
   const failed = p.recipients.filter((r) => r.status === 'FAILED' || r.status === 'RETURNED')
+  if (failed.length === 0 && p.kind === 'CLOSE') await markClosed(p.collectiveId)
   await prisma.proposal.update({
     where: { id: p.id },
     data:
@@ -184,7 +189,7 @@ export async function refreshPayoutBatch(proposalId: string) {
 /** Approver-triggered retry after PayPal rejected the whole batch (nothing was paid). */
 export async function retryPayout(proposalId: string) {
   const p = await prisma.proposal.findUnique({ where: { id: proposalId }, include: { recipients: true } })
-  if (!p || p.status !== 'FAILED' || p.kind !== 'SPEND') return { ok: false, error: 'Nothing to retry.' }
+  if (!p || p.status !== 'FAILED' || !PAYOUT_KINDS.includes(p.kind)) return { ok: false, error: 'Nothing to retry.' }
   if (p.recipients.some((r) => r.status === 'SUCCEEDED' || r.status === 'UNCLAIMED')) {
     return { ok: false, error: 'Some recipients were already paid; create a new request for the rest.' }
   }

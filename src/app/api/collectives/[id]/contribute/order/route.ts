@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getViewer } from '@/lib/collectives'
 import { createOrder, PayPalError } from '@/lib/paypal'
 import { contributionCustomId } from '@/lib/ledger'
+import { treasuryLock } from '@/lib/exit'
 
 const MIN_CENTS = 100
 const MAX_CENTS = 1_000_000
@@ -16,6 +17,8 @@ export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id
   const collective = await prisma.collective.findUnique({ where: { id }, include: { goals: true } })
   const viewer = await getViewer(id)
   if (!collective || !viewer) return NextResponse.json({ error: 'Collective not found' }, { status: 404 })
+  const locked = await treasuryLock(id)
+  if (locked) return NextResponse.json({ error: locked }, { status: 409 })
   const goal = goalId ? collective.goals.find((g) => g.id === goalId) : null
   if (goalId && !goal) return NextResponse.json({ error: 'That goal does not exist.' }, { status: 400 })
 

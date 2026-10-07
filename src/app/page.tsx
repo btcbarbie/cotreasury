@@ -253,6 +253,7 @@ function TreasuryGrid({ collectives, demo }: { collectives: Awaited<ReturnType<t
                   <meta.Icon size={15} strokeWidth={2} />
                 </span>
                 {meta.label}
+                {c.status !== 'OPEN' && <span className="pill pill-gray !h-[20px] !text-[11px]">{c.status === 'CLOSED' ? 'Closed' : 'Closing'}</span>}
               </div>
               <Link href={`/c/${c.id}`} aria-label={`Open ${c.name}`}>
                 <ArrowUpRight size={16} className="text-faint transition group-hover:text-ink" />
