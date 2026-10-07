@@ -21,6 +21,9 @@ export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id
     return NextResponse.json(await askTreasurer(id, trimmed, viewer ? { id: viewer.id, name: viewer.name, role: viewer.role } : null))
   } catch (e) {
     console.error('Treasurer error', e)
-    return NextResponse.json({ error: 'The Treasurer is unavailable right now.' }, { status: 502 })
+    // Say what kind of failure it was (never any credentials), so it can be diagnosed from the outside.
+    const err = e as { status?: number; error?: { error?: { type?: string } }; name?: string }
+    const code = err.status ? `anthropic_${err.status}${err.error?.error?.type ? `_${err.error.error.type}` : ''}` : (err.name ?? 'error')
+    return NextResponse.json({ error: 'The Treasurer is unavailable right now.', code }, { status: 502 })
   }
 }
