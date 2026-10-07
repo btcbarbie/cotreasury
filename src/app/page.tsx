@@ -15,7 +15,7 @@ const KIND_META: Record<string, { label: string; Icon: typeof Users; tone: strin
 const PILLARS = [
   {
     title: 'AI Treasurer',
-    body: 'AI never holds or controls your money. It helps manage the treasury fairly.',
+    body: 'AI never holds or controls funds. It helps manage the treasury fairly.',
     Icon: Sparkles,
     tone: 'bg-violet-soft text-violet',
   },
