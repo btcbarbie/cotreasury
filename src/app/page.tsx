@@ -89,24 +89,24 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
       {/* Hero: text on the left, who it's for on the right (stacks on phones) */}
-      <section className="relative grid items-center gap-10 pt-14 pb-14 sm:pt-20 sm:pb-16 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-14">
+      <section className="relative grid items-center gap-8 pt-8 pb-8 sm:pt-10 sm:pb-9 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-14">
         <div className="pointer-events-none absolute -top-10 right-0 -z-10 h-72 w-72 rounded-full bg-violet/10 blur-3xl sm:h-96 sm:w-96" />
         <div className="pointer-events-none absolute top-24 -left-10 -z-10 h-56 w-56 rounded-full bg-teal/10 blur-3xl" />
         <div>
-          <span className="pill pill-violet mb-5">Collective goal. Collective treasury. Collective control.</span>
-          <h1 className="text-5xl font-semibold leading-none tracking-tight sm:text-7xl">
+          <span className="pill pill-violet mb-4">Collective goal. Collective treasury. Collective control.</span>
+          <h1 className="text-5xl font-semibold leading-none tracking-tight sm:text-6xl">
             <span className="bg-gradient-to-r from-accent via-teal to-violet bg-clip-text text-transparent">CoTreasury</span>
           </h1>
-          <p className="mt-4 max-w-3xl text-lg font-medium leading-snug tracking-tight sm:text-2xl">
+          <p className="mt-3 max-w-3xl text-lg font-medium leading-snug tracking-tight sm:text-2xl">
             Money works better when everyone can see it.
           </p>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
             CoTreasury gives groups one shared place to raise funds, make collective financial decisions, and keep track of every payment.
           </p>
           <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
             AI helps manage the treasury. Your group sets the rules. PayPal handles approved payments.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-3">
             <a href="#get-started" className="btn btn-primary !h-11 !px-5">
               Create a Treasury <ArrowRight size={16} />
             </a>
@@ -137,16 +137,18 @@ export default function Home() {
       </Suspense>
 
       {/* Pillars */}
-      <section id="how-it-works" className="scroll-mt-20 border-t border-line py-14 sm:py-16">
+      <section id="how-it-works" className="scroll-mt-20 border-t border-line pt-7 pb-14 sm:pt-8 sm:pb-16">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your treasury. Your rules. Your collective.</h2>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PILLARS.map((p) => (
             <div key={p.title} className="card p-5">
-              <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${p.tone}`}>
-                <p.Icon size={17} strokeWidth={2} />
-              </span>
-              <div className="mt-4 font-semibold tracking-tight">{p.title}</div>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">{p.body}</p>
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${p.tone}`}>
+                  <p.Icon size={17} strokeWidth={2} />
+                </span>
+                <div className="font-semibold leading-snug tracking-tight">{p.title}</div>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-muted">{p.body}</p>
             </div>
           ))}
         </div>
