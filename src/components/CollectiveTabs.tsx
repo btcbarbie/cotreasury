@@ -55,7 +55,6 @@ export function CollectiveTabs(props: {
   currency: string
   viewerId: string
   viewerRole: string
-  newPayeeRule: boolean
   goals: GoalProgress[]
   events: ActivityEvent[]
   members: Member[]
@@ -189,7 +188,6 @@ export function CollectiveTabs(props: {
                 tiers={props.tiers}
                 members={props.members}
                 currency={props.currency}
-                newPayeeRule={props.newPayeeRule}
                 approvalMode={props.approvalMode}
                 viewerRole={props.viewerRole}
                 ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}

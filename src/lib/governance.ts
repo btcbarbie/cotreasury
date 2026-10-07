@@ -65,8 +65,9 @@ export async function assessSpend(collectiveId: string, recipients: Recipient[],
   if (newPayees.length > 0) {
     flags.push({
       code: 'NEW_PAYEE',
-      message: `First payment to ${newPayees.length === 1 ? newPayees[0].name : `${newPayees.length} new recipients`}${c.newPayeeRule ? ' (+1 approval)' : ''}`,
-      extraApproval: c.newPayeeRule,
+      // Standard for every treasury: paying someone new always needs one extra approval.
+      message: `First payment to ${newPayees.length === 1 ? newPayees[0].name : `${newPayees.length} new recipients`} (+1 approval)`,
+      extraApproval: true,
     })
   }
   const self = recipients.find((r) => memberByEmail.get(r.receiver.trim().toLowerCase())?.id === makerId)
@@ -143,7 +144,6 @@ export function describeRuleChange(current: RulesPayload, next: RulesPayload, na
   const removed = current.approverIds.filter((id) => !next.approverIds.includes(id))
   if (added.length) lines.push(`Add approver${added.length > 1 ? 's' : ''}: ${added.map((id) => names.get(id)).join(', ')}`)
   if (removed.length) lines.push(`Remove approver${removed.length > 1 ? 's' : ''}: ${removed.map((id) => names.get(id)).join(', ')}`)
-  if (current.newPayeeRule !== next.newPayeeRule) lines.push(`New-recipient extra approval: ${next.newPayeeRule ? 'on' : 'off'}`)
   const fromMode = current.approvalMode ?? 'FIXED'
   const toMode = next.approvalMode ?? fromMode
   if (fromMode !== toMode) lines.push(`Who reviews payouts: ${APPROVAL_MODE_LABEL[fromMode]} → ${APPROVAL_MODE_LABEL[toMode]}`)

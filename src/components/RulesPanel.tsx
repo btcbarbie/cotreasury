@@ -18,6 +18,7 @@ export const MODES = [
 const CONTROLS = [
   { title: 'Maker ≠ checker', body: 'Whoever submits a request can never approve it.' },
   { title: 'Amount thresholds', body: 'Bigger spends need more approvers, set by the rules on the left.' },
+  { title: 'New recipients', body: 'The first payment to someone the treasury has never paid needs one extra approval.' },
   { title: 'Self-payment', body: 'A requester paying themselves needs one extra approval.' },
   { title: 'Governed rules', body: 'Changing rules or approvers needs the strictest tier’s approval first.' },
 ]
@@ -27,7 +28,6 @@ export function RulesPanel({
   tiers,
   members,
   currency,
-  newPayeeRule,
   approvalMode,
   viewerRole,
   ruleChangePending,
@@ -36,7 +36,6 @@ export function RulesPanel({
   tiers: Tier[]
   members: Member[]
   currency: string
-  newPayeeRule: boolean
   approvalMode: string
   viewerRole: string
   ruleChangePending: boolean
@@ -47,7 +46,7 @@ export function RulesPanel({
 
   if (editing) {
     return (
-      <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} newPayeeRule={newPayeeRule} approvalMode={approvalMode} onClose={() => setEditing(false)} />
+      <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} approvalMode={approvalMode} onClose={() => setEditing(false)} />
     )
   }
 
@@ -95,10 +94,6 @@ export function RulesPanel({
             </span>
             <span className="pill pill-violet shrink-0">{MODES.find((m) => m.id === approvalMode)?.label}</span>
           </div>
-          <div className="flex items-center justify-between py-3 text-sm">
-            <span>First payment to a new recipient</span>
-            <span className={`pill ${newPayeeRule ? 'pill-amber' : 'pill-gray'}`}>{newPayeeRule ? '+1 approval' : 'Off'}</span>
-          </div>
         </div>
       </div>
 
@@ -142,14 +137,12 @@ function RulesEditor({
   collectiveId,
   tiers,
   members,
-  newPayeeRule,
   approvalMode,
   onClose,
 }: {
   collectiveId: string
   tiers: Tier[]
   members: Member[]
-  newPayeeRule: boolean
   approvalMode: string
   onClose: () => void
 }) {
@@ -158,7 +151,6 @@ function RulesEditor({
   // Edit tiers as "upper bounds" so ranges always stay contiguous.
   const [rows, setRows] = useState(tiers.map((t) => ({ upTo: t.maxCents === null ? '' : String(t.maxCents / 100), approvals: t.requiredApprovals })))
   const [approverIds, setApproverIds] = useState(members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN').map((m) => m.id))
-  const [payeeRule, setPayeeRule] = useState(newPayeeRule)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
@@ -179,7 +171,7 @@ function RulesEditor({
       const res = await proposeRuleChange(collectiveId, {
         tiers: build(),
         approverIds,
-        newPayeeRule: payeeRule,
+        newPayeeRule: true,
         approvalMode: mode as 'FIXED' | 'RANDOM' | 'MIXED',
         removeMemberIds: removeIds,
       })
@@ -307,11 +299,6 @@ function RulesEditor({
             )
           })}
       </div>
-
-      <label className="mt-6 flex cursor-pointer items-center gap-2.5 text-sm">
-        <input type="checkbox" checked={payeeRule} onChange={() => setPayeeRule(!payeeRule)} className="accent-[var(--accent)]" />
-        First payment to a new recipient needs one extra approval
-      </label>
 
       {error && <div className="mt-4 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
       <div className="mt-6 flex justify-end gap-2">

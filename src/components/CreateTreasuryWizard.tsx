@@ -50,7 +50,6 @@ export function CreateTreasuryWizard() {
   ])
   const [preset, setPreset] = useState<'light' | 'balanced' | 'strict'>('balanced')
   const [rows, setRows] = useState<TierRow[] | null>(null)
-  const [newPayeeRule, setNewPayeeRule] = useState(true)
   const [approvalMode, setApprovalMode] = useState<'FIXED' | 'RANDOM' | 'MIXED'>('FIXED')
   const [paypalEmail, setPaypalEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -108,7 +107,7 @@ export function CreateTreasuryWizard() {
       creator,
       people: filled,
       tiers,
-      newPayeeRule,
+      newPayeeRule: true,
       approvalMode,
       paypalEmail: paypalEmail || creator.email,
     }
@@ -289,13 +288,6 @@ export function CreateTreasuryWizard() {
                 )
               })}
             </div>
-            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm">
-              <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={newPayeeRule} onChange={() => setNewPayeeRule(!newPayeeRule)} />
-              <span>
-                <span className="font-medium">Extra approval for new recipients</span>
-                <span className="block text-muted">The first payment to someone the treasury has never paid needs one more sign-off.</span>
-              </span>
-            </label>
             <div className="mt-5 label">Who reviews payouts</div>
             <div className="mt-2 grid gap-2">
               {MODES.map((m) => (
@@ -313,7 +305,7 @@ export function CreateTreasuryWizard() {
             </div>
             <div className="mt-4 flex items-start gap-2 rounded-xl bg-accent-soft px-3 py-2.5 text-sm text-accent">
               <ShieldCheck size={16} className="mt-0.5 shrink-0" />
-              Always on: no one approves their own request, and anyone paying themselves needs an extra approval.
+              Always on: no one approves their own request, the first payment to a new recipient needs one extra approval, and so does anyone paying themselves.
             </div>
           </section>
         )}
@@ -386,7 +378,6 @@ export function CreateTreasuryWizard() {
                       </span>
                     </li>
                   ))}
-                  {newPayeeRule && <li className="text-muted">+1 approval for first payments to new recipients</li>}
                   <li className="text-muted">Reviewed by: {MODES.find((m) => m.id === approvalMode)?.label}</li>
                 </ul>
               </div>

@@ -150,7 +150,7 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
           approvals_required: `${t.requiredApprovals} of ${approvers.length}`,
         })),
         approvers: approvers.map((a) => a.name),
-        new_recipient_rule: c.newPayeeRule ? 'ON: the first payment to a never-paid recipient needs one extra approval' : 'OFF',
+        new_recipient_rule: 'ALWAYS ON: the first payment to a never-paid recipient needs one extra approval',
         other_controls: [
           'Maker-checker: whoever submits a request cannot approve it',
           'A requester paying themselves needs one extra approval',

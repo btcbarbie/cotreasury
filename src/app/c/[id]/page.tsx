@@ -204,7 +204,6 @@ async function CollectiveContent({
             approvedBy: e.proposal?.approvals.map((a) => a.member.name) ?? [],
           }
         })}
-        newPayeeRule={collective.newPayeeRule}
         goals={goalProgress(collective.goals, collective.members, collective.entries)}
         events={collective.events.map((e) => ({ id: e.id, seq: e.seq, actor: e.actor, action: e.action, summary: e.summary, createdAt: e.createdAt.toISOString(), hash: e.hash }))}
         proposals={collective.proposals.map((p) => ({
