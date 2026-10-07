@@ -74,15 +74,13 @@ export default function Home() {
           <span className="bg-gradient-to-r from-accent via-teal to-violet bg-clip-text text-transparent">CoTreasury</span>
         </h1>
         <p className="mt-4 max-w-3xl text-lg font-medium leading-snug tracking-tight sm:text-2xl">
-          A treasury governed by the collective it serves.
+          Money works better when everyone can see it.
         </p>
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
-          When people share a purpose, managing the money shouldn&apos;t depend on one person. CoTreasury gives groups a shared
-          financial layer to coordinate contributions, understand their treasury, govern spending, and act together, with AI
-          as the financial coordinator and people in control.
+          CoTreasury gives groups one shared place to collect money, make decisions, and keep track of every payment.
         </p>
         <p className="mt-5 text-sm font-medium tracking-tight sm:text-base">
-          AI coordinates. People govern. PayPal moves. The ledger remembers.
+          AI helps manage the treasury. Your group sets the rules. PayPal handles approved payments.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/new" className="btn btn-primary !h-11 !px-5">
