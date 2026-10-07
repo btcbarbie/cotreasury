@@ -83,7 +83,9 @@ export default function Home() {
           AI helps manage the treasury. Your group sets the rules. PayPal handles approved payments.
         </p>
         <div className="mt-6">
-          <div className="text-sm font-medium tracking-tight">Built for groups that manage money together.</div>
+          <div className="flex items-center gap-2 text-sm font-medium text-accent">
+            <Users size={16} /> Built for groups that manage money together
+          </div>
           <div className="mt-1 text-sm text-muted">Scholarship funds · Clubs · Communities · Group projects · Shared purchases</div>
         </div>
         <div className="mt-8 flex flex-wrap gap-3">
