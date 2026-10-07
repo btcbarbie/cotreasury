@@ -56,7 +56,7 @@ export default function Home() {
         <h1 className="text-5xl font-semibold leading-none tracking-tight sm:text-7xl">
           <span className="bg-gradient-to-r from-accent via-teal to-violet bg-clip-text text-transparent">CoTreasury</span>
         </h1>
-        <p className="mt-4 max-w-3xl text-2xl font-semibold leading-snug tracking-tight sm:text-4xl">
+        <p className="mt-4 max-w-3xl text-lg font-medium leading-snug tracking-tight sm:text-2xl">
           A treasury governed by the collective it serves.
         </p>
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
