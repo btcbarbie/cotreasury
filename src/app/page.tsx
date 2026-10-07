@@ -26,8 +26,8 @@ const PILLARS = [
     tone: 'bg-accent-soft text-accent',
   },
   {
-    title: 'PayPal handles the payments',
-    body: 'When the group approves a payment, it goes through PayPal.',
+    title: 'Money through PayPal',
+    body: 'Use PayPal to contribute to the treasury and make approved payouts.',
     Icon: Send,
     tone: 'bg-blue-soft text-blue',
   },
