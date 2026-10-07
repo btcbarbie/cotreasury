@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full scroll-smooth`}>
       <body className="min-h-full flex flex-col">
         <header className="border-b border-line bg-surface/80 backdrop-blur sticky top-0 z-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between">

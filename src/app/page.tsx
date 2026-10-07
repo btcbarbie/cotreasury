@@ -107,9 +107,9 @@ export default function Home() {
             AI helps manage the treasury. Your group sets the rules. PayPal handles approved payments.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/new" className="btn btn-primary !h-11 !px-5">
+            <a href="#get-started" className="btn btn-primary !h-11 !px-5">
               Create a Treasury <ArrowRight size={16} />
-            </Link>
+            </a>
             <a href="#how-it-works" className="btn btn-ghost !h-11 !px-5">
               See How It Works
             </a>
@@ -196,8 +196,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Closing call to action */}
-      <section className="pb-16 sm:pb-20">
+      {/* Closing call to action (the hero's Create a Treasury button scrolls here) */}
+      <section id="get-started" className="scroll-mt-24 pb-16 sm:pb-20">
         <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-r from-accent via-teal to-violet px-6 py-12 text-center text-white sm:py-14">
           <div className="pointer-events-none absolute -top-16 -left-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
           <div className="pointer-events-none absolute -right-10 -bottom-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
