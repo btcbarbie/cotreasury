@@ -7,55 +7,23 @@ import { addGoal } from '@/app/c/[id]/actions'
 import type { GoalProgress } from '@/lib/goals'
 import { Avatar } from './ui'
 
-export type MoneySummary = {
-  inCents: number
-  outCents: number
-  balanceCents: number
-  pendingInCents: number
-  pendingOutCents: number
-  awaitingApprovalCents: number
-}
-
 export function OverviewPanel({
   collectiveId,
   currency,
-  summary,
   goals,
   canManage,
   viewerId,
 }: {
   collectiveId: string
   currency: string
-  summary: MoneySummary
   goals: GoalProgress[]
   canManage: boolean
   viewerId: string
 }) {
   const [adding, setAdding] = useState(false)
-  const m = (c: number) => formatMoney(c, currency)
-  const waiting = [
-    summary.pendingInCents > 0 && `${m(summary.pendingInCents)} coming in, waiting for PayPal`,
-    summary.pendingOutCents > 0 && `${m(summary.pendingOutCents)} being paid out`,
-    summary.awaitingApprovalCents > 0 && `${m(summary.awaitingApprovalCents)} waiting for approval`,
-  ].filter(Boolean) as string[]
 
   return (
     <div className="grid gap-5">
-      {/* The whole treasury in one line: what came in, what went out, what's left. */}
-      <div className="card p-5">
-        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-end gap-2 sm:gap-4">
-          <Figure label="Money in" value={m(summary.inCents)} tone="text-accent" sign="+" />
-          <span className="pb-1 text-xl text-faint">−</span>
-          <Figure label="Money out" value={m(summary.outCents)} />
-          <span className="pb-1 text-xl text-faint">=</span>
-          <Figure label="In the treasury now" value={m(summary.balanceCents)} strong />
-        </div>
-        <p className="mt-3 text-xs text-muted">
-          Only money PayPal has confirmed is counted.
-          {waiting.length > 0 && <> Not counted yet: {waiting.join(' · ')}.</>}
-        </p>
-      </div>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-semibold tracking-tight">What the collective is working towards</h3>
         {canManage && !adding && (
@@ -78,18 +46,6 @@ export function OverviewPanel({
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-function Figure({ label, value, tone, sign, strong }: { label: string; value: string; tone?: string; sign?: string; strong?: boolean }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[11px] uppercase tracking-wide text-muted sm:text-xs">{label}</div>
-      <div className={`tabular truncate font-semibold tracking-tight ${strong ? 'text-xl sm:text-3xl' : 'text-base sm:text-2xl'} ${tone ?? ''}`}>
-        {sign}
-        {value}
-      </div>
     </div>
   )
 }

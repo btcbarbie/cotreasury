@@ -158,14 +158,6 @@ async function CollectiveContent({
           paypalRef: e.paypalRef,
         }))}
         newPayeeRule={collective.newPayeeRule}
-        summary={{
-          inCents: collective.entries.filter((e) => e.direction === 'IN' && e.status === 'CONFIRMED').reduce((s, e) => s + e.amountCents, 0),
-          outCents: collective.entries.filter((e) => e.direction === 'OUT' && e.status === 'CONFIRMED').reduce((s, e) => s + e.amountCents, 0),
-          balanceCents: treasury.confirmedBalanceCents,
-          pendingInCents: treasury.pendingInCents,
-          pendingOutCents: treasury.pendingOutCents,
-          awaitingApprovalCents: treasury.awaitingApprovalCents,
-        }}
         goals={goalProgress(collective.goals, collective.members, collective.entries)}
         events={collective.events.map((e) => ({ id: e.id, seq: e.seq, actor: e.actor, action: e.action, summary: e.summary, createdAt: e.createdAt.toISOString(), hash: e.hash }))}
         proposals={collective.proposals.map((p) => ({

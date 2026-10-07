@@ -8,7 +8,7 @@ import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
 import { NewRequestForm } from './NewRequestForm'
-import { OverviewPanel, type MoneySummary } from './OverviewPanel'
+import { OverviewPanel } from './OverviewPanel'
 import { AttentionPanel, attentionItems } from './AttentionPanel'
 import { ActivityPanel, type ActivityEvent } from './ActivityPanel'
 import type { GoalProgress } from '@/lib/goals'
@@ -49,7 +49,6 @@ export function CollectiveTabs(props: {
   viewerId: string
   viewerRole: string
   newPayeeRule: boolean
-  summary: MoneySummary
   goals: GoalProgress[]
   events: ActivityEvent[]
   members: Member[]
@@ -104,7 +103,6 @@ export function CollectiveTabs(props: {
             <OverviewPanel
               collectiveId={props.collectiveId}
               currency={props.currency}
-              summary={props.summary}
               goals={props.goals}
               canManage={props.viewerRole === 'APPROVER' || props.viewerRole === 'ADMIN'}
               viewerId={props.viewerId}
