@@ -8,6 +8,11 @@ import { formatMoney } from './money'
 
 const DAY = 24 * 60 * 60 * 1000
 
+/** The showcase treasuries every visitor sees. */
+export const DEMO_NAMES = ['The Maya Thompson Scholarship 🎓', "Girls' Trip to Lisbon 🇵🇹"]
+/** Earlier demo stories, replaced at startup. */
+export const RETIRED_DEMO_NAMES = ['Whitmore Family Scholarship Fund', 'Westfield Eagles Booster Club']
+
 function daysAgo(n: number) {
   return new Date(Date.now() - n * DAY)
 }
@@ -72,7 +77,7 @@ async function createCollective(
     goalIds.set(g.title, goal.id)
   }
 
-  await prisma.ledgerEntry.create({
+  if (data.openingCents > 0) await prisma.ledgerEntry.create({
     data: {
       collectiveId: collective.id,
       type: 'OPENING_BALANCE',
@@ -169,124 +174,99 @@ export async function writeDemoHistory(prisma: PrismaClient, collectiveId: strin
 
 export async function createDemoCollectives(prisma: PrismaClient) {
   const scholarship = await createCollective(prisma, {
-    name: 'Whitmore Family Scholarship Fund',
+    name: DEMO_NAMES[0],
     purpose:
-      'Alumni-funded scholarships for first-generation college students from Riverside High. Five trustees approve every award.',
+      "Help us give Maya a chance to start college without carrying the whole burden herself. Maya has been accepted to Howard University. We're a group of family friends and former classmates putting money together to help cover her first year. Everyone can see what has come in, what's been approved, and what's been paid.",
     kind: 'SCHOLARSHIP_FUND',
-    paypalEmail: 'treasury@whitmorefund.org',
-    domain: 'alumni.example',
+    paypalEmail: 'maya.scholarship@example.com',
+    domain: 'friends.example',
     members: [
-      { name: 'Grace Adeyemi', role: 'ADMIN' },
-      { name: 'Daniel Brooks', role: 'APPROVER' },
-      { name: 'Ifeoma Nwosu', role: 'APPROVER' },
-      { name: 'Marcus Lee', role: 'APPROVER' },
-      { name: 'Sarah Whitfield', role: 'APPROVER' },
-      { name: 'Tunde Bakare' },
-      { name: 'Emily Carter' },
-      { name: 'Chidi Eze' },
-      { name: 'Hannah Kim' },
-      { name: 'Joshua Martins' },
-      { name: 'Priya Nair' },
-      { name: 'Olumide Shittu' },
+      { name: 'Angela Brooks', role: 'ADMIN' },
+      { name: 'Marcus Reed', role: 'APPROVER' },
+      { name: 'Keisha Johnson', role: 'APPROVER' },
+      { name: 'David Kim', role: 'APPROVER' },
+      { name: 'Tiana Williams' },
+      { name: 'Jordan Ellis' },
+      { name: 'Olivia Grant' },
+      { name: 'Brandon Hayes' },
+      { name: 'Naomi Foster' },
+      { name: 'Chris Adeyemi' },
     ],
     tiers: [
       { minCents: 0, maxCents: 50_000, requiredApprovals: 1 },
-      { minCents: 50_000, maxCents: 500_000, requiredApprovals: 2 },
-      { minCents: 500_000, maxCents: 2_500_000, requiredApprovals: 3 },
-      { minCents: 2_500_000, maxCents: null, requiredApprovals: 4 },
+      { minCents: 50_000, maxCents: 300_000, requiredApprovals: 2 },
+      { minCents: 300_000, maxCents: null, requiredApprovals: 3 },
     ],
-    openingCents: 820_000,
-    openingDaysAgo: 120,
+    openingCents: 0,
+    openingDaysAgo: 70,
+    goals: [
+      { title: 'First-year tuition gap', kind: 'TARGET', perMemberCents: 60_000, dueInDays: 35 },
+      { title: 'Books & laptop', kind: 'TARGET', perMemberCents: 10_000, dueInDays: 20 },
+    ],
     contributions: [
-      { member: 'Tunde Bakare', cents: 100_000, daysAgo: 96, memo: 'Annual pledge' },
-      { member: 'Emily Carter', cents: 50_000, daysAgo: 88 },
-      { member: 'Chidi Eze', cents: 25_000, daysAgo: 80 },
-      { member: 'Hannah Kim', cents: 75_000, daysAgo: 71, memo: 'Matched by employer' },
-      { member: 'Joshua Martins', cents: 30_000, daysAgo: 60 },
-      { member: 'Priya Nair', cents: 120_000, daysAgo: 44, memo: 'Annual pledge' },
-      { member: 'Olumide Shittu', cents: 40_000, daysAgo: 31, goal: 'Fall 2026 awards' },
-      { member: 'Grace Adeyemi', cents: 60_000, daysAgo: 18, goal: 'Fall 2026 awards' },
-      { member: 'Marcus Lee', cents: 35_000, daysAgo: 9, goal: 'Fall 2026 awards' },
+      { member: 'Angela Brooks', cents: 60_000, daysAgo: 64, goal: 'First-year tuition gap' },
+      { member: 'Marcus Reed', cents: 60_000, daysAgo: 60, goal: 'First-year tuition gap' },
+      { member: 'Keisha Johnson', cents: 30_000, daysAgo: 55, memo: 'First half', goal: 'First-year tuition gap' },
+      { member: 'David Kim', cents: 60_000, daysAgo: 50, goal: 'First-year tuition gap' },
+      { member: 'Tiana Williams', cents: 25_000, daysAgo: 41, memo: 'From our old study group', goal: 'First-year tuition gap' },
+      { member: 'Jordan Ellis', cents: 10_000, daysAgo: 33, goal: 'Books & laptop' },
+      { member: 'Olivia Grant', cents: 60_000, daysAgo: 27, memo: 'Matched by my employer', goal: 'First-year tuition gap' },
+      { member: 'Brandon Hayes', cents: 10_000, daysAgo: 19, goal: 'Books & laptop' },
+      { member: 'Naomi Foster', cents: 15_000, daysAgo: 12, goal: 'First-year tuition gap' },
+      { member: 'Chris Adeyemi', cents: 10_000, daysAgo: 6, goal: 'Books & laptop' },
     ],
-    goals: [{ title: 'Fall 2026 awards', kind: 'TARGET', perMemberCents: 50_000, dueInDays: 40 }],
-    payouts: [{ title: 'Spring award — 2 scholarships', to: '2 students', cents: 300_000, daysAgo: 55 }],
+    payouts: [{ title: 'Enrollment deposit', to: 'Howard University', cents: 50_000, daysAgo: 30 }],
   })
 
-  const booster = await createCollective(prisma, {
-    name: 'Westfield Eagles Booster Club',
+  const trip = await createCollective(prisma, {
+    name: DEMO_NAMES[1],
     purpose:
-      'Parent-run fund for the Westfield High varsity teams: travel, uniforms and equipment. Three officers share approval.',
-    kind: 'BOOSTER_CLUB',
-    paypalEmail: 'boosters@westfieldeagles.org',
-    domain: 'parents.example',
+      "Eight of us. One trip. One place to keep the money together. We're finally doing the trip we've been talking about for years. Everyone is putting in what they can, and we're using this treasury to keep contributions, bookings, and spending in one place.",
+    kind: 'GROUP_TRIP',
+    paypalEmail: 'lisbon.trip@example.com',
+    domain: 'friends.example',
     members: [
-      { name: 'Linda Morales', role: 'ADMIN' },
-      { name: 'Kevin Osei', role: 'APPROVER' },
-      { name: 'Rachel Turner', role: 'APPROVER' },
-      { name: 'Brian Walsh' },
-      { name: 'Aisha Bello' },
-      { name: 'Tom Henderson' },
-      { name: 'Mei Chen' },
-      { name: 'Carlos Rivera' },
+      { name: 'Chloe Bennett', role: 'ADMIN' },
+      { name: 'Jasmine Okoro', role: 'APPROVER' },
+      { name: 'Sofia Martins', role: 'APPROVER' },
+      { name: 'Amara Nwosu' },
+      { name: 'Lauren Price' },
+      { name: 'Nadia Haddad' },
+      { name: 'Emily Tran' },
+      { name: 'Zoe Carter' },
     ],
     tiers: [
-      { minCents: 0, maxCents: 25_000, requiredApprovals: 1 },
-      { minCents: 25_000, maxCents: 200_000, requiredApprovals: 2 },
-      { minCents: 200_000, maxCents: null, requiredApprovals: 3 },
+      { minCents: 0, maxCents: 20_000, requiredApprovals: 1 },
+      { minCents: 20_000, maxCents: null, requiredApprovals: 2 },
     ],
-    openingCents: 312_000,
-    openingDaysAgo: 75,
-    contributions: [
-      { member: 'Brian Walsh', cents: 15_000, daysAgo: 62, memo: 'Season dues', goal: 'Season dues 2026' },
-      { member: 'Aisha Bello', cents: 15_000, daysAgo: 61, memo: 'Season dues', goal: 'Season dues 2026' },
-      { member: 'Tom Henderson', cents: 15_000, daysAgo: 58, memo: 'Season dues', goal: 'Season dues 2026' },
-      { member: 'Mei Chen', cents: 25_000, daysAgo: 40, memo: 'Bake sale proceeds' },
-      { member: 'Carlos Rivera', cents: 15_000, daysAgo: 33, memo: 'Season dues', goal: 'Season dues 2026' },
-    ],
+    openingCents: 0,
+    openingDaysAgo: 90,
     goals: [
-      { title: 'Season dues 2026', kind: 'TARGET', perMemberCents: 15_000, dueInDays: 10 },
-      { title: 'Regional finals bus', kind: 'TARGET', perMemberCents: 5_000, dueInDays: 45 },
+      { title: 'Flights & apartment', kind: 'TARGET', perMemberCents: 90_000, dueInDays: 50 },
+      { title: 'Spending money', kind: 'TARGET', perMemberCents: 30_000, dueInDays: 70 },
     ],
-    payouts: [{ title: 'New basketball uniforms', to: 'Midwest Team Supply', cents: 96_000, daysAgo: 26 }],
+    contributions: [
+      { member: 'Chloe Bennett', cents: 90_000, daysAgo: 80, goal: 'Flights & apartment' },
+      { member: 'Jasmine Okoro', cents: 90_000, daysAgo: 78, goal: 'Flights & apartment' },
+      { member: 'Sofia Martins', cents: 45_000, daysAgo: 70, memo: 'First half', goal: 'Flights & apartment' },
+      { member: 'Amara Nwosu', cents: 90_000, daysAgo: 66, goal: 'Flights & apartment' },
+      { member: 'Lauren Price', cents: 60_000, daysAgo: 52, goal: 'Flights & apartment' },
+      { member: 'Nadia Haddad', cents: 90_000, daysAgo: 45, goal: 'Flights & apartment' },
+      { member: 'Emily Tran', cents: 30_000, daysAgo: 30, goal: 'Flights & apartment' },
+      { member: 'Zoe Carter', cents: 90_000, daysAgo: 21, goal: 'Flights & apartment' },
+      { member: 'Sofia Martins', cents: 45_000, daysAgo: 14, memo: 'Second half', goal: 'Flights & apartment' },
+      { member: 'Chloe Bennett', cents: 15_000, daysAgo: 5, goal: 'Spending money' },
+    ],
+    payouts: [
+      { title: 'Apartment deposit: Alfama, 6 nights', to: 'Alfama apartment host', cents: 140_000, daysAgo: 40 },
+      { title: 'Fado night reservation', to: 'Fado house in Alfama', cents: 24_000, daysAgo: 10 },
+    ],
   })
 
-  return { scholarship, booster }
+  return { scholarship, trip }
 }
 
-// Goals for demo treasuries created before goals existed (production backfill).
-const DEMO_GOAL_BACKFILL: Record<string, { goals: { title: string; perMemberCents: number; dueInDays: number }[]; tags: { member: string; cents: number; goal: string }[] }> = {
-  'Whitmore Family Scholarship Fund': {
-    goals: [{ title: 'Fall 2026 awards', perMemberCents: 50_000, dueInDays: 40 }],
-    tags: [
-      { member: 'Olumide Shittu', cents: 40_000, goal: 'Fall 2026 awards' },
-      { member: 'Grace Adeyemi', cents: 60_000, goal: 'Fall 2026 awards' },
-      { member: 'Marcus Lee', cents: 35_000, goal: 'Fall 2026 awards' },
-    ],
-  },
-  'Westfield Eagles Booster Club': {
-    goals: [
-      { title: 'Season dues 2026', perMemberCents: 15_000, dueInDays: 10 },
-      { title: 'Regional finals bus', perMemberCents: 5_000, dueInDays: 45 },
-    ],
-    tags: ['Brian Walsh', 'Aisha Bello', 'Tom Henderson', 'Carlos Rivera'].map((member) => ({ member, cents: 15_000, goal: 'Season dues 2026' })),
-  },
-}
-
+/** Seal the activity history for a demo that doesn't have one yet. */
 export async function backfillDemo(prisma: PrismaClient, collectiveId: string) {
-  const c = await prisma.collective.findUniqueOrThrow({ where: { id: collectiveId }, include: { goals: true } })
-  const plan = DEMO_GOAL_BACKFILL[c.name]
-  if (plan && c.goals.length === 0) {
-    for (const g of plan.goals) {
-      const goal = await prisma.goal.create({
-        data: { collectiveId, title: g.title, kind: 'TARGET', perMemberCents: g.perMemberCents, dueDate: new Date(Date.now() + g.dueInDays * DAY) },
-      })
-      for (const t of plan.tags.filter((x) => x.goal === g.title)) {
-        await prisma.ledgerEntry.updateMany({
-          where: { collectiveId, type: 'CONTRIBUTION', source: 'IMPORTED', counterparty: t.member, amountCents: t.cents, goalId: null },
-          data: { goalId: goal.id },
-        })
-      }
-    }
-  }
   await writeDemoHistory(prisma, collectiveId)
 }

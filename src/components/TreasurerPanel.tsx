@@ -13,9 +13,14 @@ const DEFAULT_SUGGESTIONS = ["Who hasn't paid yet?", 'How much can we spend righ
 
 const SUGGESTIONS: Record<string, string[]> = {
   SCHOLARSHIP_FUND: [
-    'Can we fund 4 scholarships at $1,500 each?',
-    "Who hasn't paid for the Fall 2026 awards?",
-    'Who needs to sign off on a $6,000 award?',
+    'Can we afford a $1,200 tuition payment?',
+    "Who hasn't paid their share yet?",
+    'Who needs to approve a $3,000 payment?',
+  ],
+  GROUP_TRIP: [
+    'Can we afford a $1,400 apartment deposit?',
+    "Who hasn't paid their share yet?",
+    'Who needs to approve a $500 booking?',
   ],
   BOOSTER_CLUB: [
     'Can we afford a $1,850 bus to the regional finals?',
@@ -188,7 +193,7 @@ export function TreasurerPanel({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={assistant ? 'e.g. Pay Maya Chen $40 for lab equipment…' : 'Ask the Treasurer about the money…'}
+            placeholder={assistant ? 'e.g. Pay Maya Thompson $120 for textbooks…' : 'Ask the Treasurer about the money…'}
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
           />
           <button

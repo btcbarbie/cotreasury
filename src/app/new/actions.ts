@@ -20,7 +20,7 @@ export type NewTreasury = {
   paypalEmail: string
 }
 
-const KINDS = new Set(['SCHOLARSHIP_FUND', 'BOOSTER_CLUB', 'COMMUNITY_FUND', 'OTHER'])
+const KINDS = new Set(['SCHOLARSHIP_FUND', 'GROUP_TRIP', 'BOOSTER_CLUB', 'COMMUNITY_FUND', 'OTHER'])
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Everything is re-validated here; the wizard's own checks are only for UX. */

@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { connection } from 'next/server'
-import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, GraduationCap, HandHeart, Link2, Plus, Scale, Send, ShieldCheck, Sparkles, Trophy, UserX, Users } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, GraduationCap, HandHeart, Link2, Plane, Plus, Scale, Send, ShieldCheck, Sparkles, Trophy, UserX, Users } from 'lucide-react'
 import { listCollectives, myTreasuryIds } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 
 const KIND_META: Record<string, { label: string; Icon: typeof Users; tone: string; bar: string }> = {
   SCHOLARSHIP_FUND: { label: 'Scholarship fund', Icon: GraduationCap, tone: 'bg-violet-soft text-violet', bar: 'from-violet to-teal' },
+  GROUP_TRIP: { label: 'Group trip', Icon: Plane, tone: 'bg-blue-soft text-blue', bar: 'from-blue to-teal' },
   BOOSTER_CLUB: { label: 'Booster club', Icon: Trophy, tone: 'bg-amber-soft text-amber', bar: 'from-amber to-red' },
   COMMUNITY_FUND: { label: 'Community fund', Icon: HandHeart, tone: 'bg-accent-soft text-accent', bar: 'from-accent to-teal' },
   OTHER: { label: 'Treasury', Icon: Users, tone: 'bg-blue-soft text-blue', bar: 'from-blue to-violet' },
