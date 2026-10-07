@@ -79,7 +79,7 @@ export default function Home() {
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
           CoTreasury gives groups one shared place to raise funds, make collective financial decisions, and keep track of every payment.
         </p>
-        <p className="mt-5 text-sm font-medium tracking-tight sm:text-base">
+        <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
           AI helps manage the treasury. Your group sets the rules. PayPal handles approved payments.
         </p>
         <div className="mt-6">
