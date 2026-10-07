@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { connection } from 'next/server'
 import Link from 'next/link'
-import { ArrowDownLeft, ArrowUpRight, BellRing, ChevronLeft, PartyPopper, Clock, Landmark } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
@@ -16,6 +16,7 @@ import { goalProgress } from '@/lib/goals'
 import { getMerchantAccount } from '@/lib/paypal'
 import { unseenFor } from '@/lib/notifications'
 import { NotificationsCard } from '@/components/NotificationsCard'
+import { ApprovalsPill } from '@/components/ApprovalsPill'
 
 export default function CollectivePage({ params, searchParams }: PageProps<'/c/[id]'>) {
   return (
@@ -54,11 +55,22 @@ async function CollectiveContent({
   ]
 
   // Approver inbox: open requests this viewer is allowed to vote on and hasn't yet.
-  const needsMe = canApprove(viewer.role)
-    ? collective.proposals.filter(
-        (p) => p.status === 'PENDING_APPROVAL' && p.proposedById !== viewer.id && !p.approvals.some((a) => a.memberId === viewer.id),
-      ).length
-    : 0
+  const pendingForMe = canApprove(viewer.role)
+    ? collective.proposals
+        .filter((p) => p.status === 'PENDING_APPROVAL' && p.proposedById !== viewer.id && !p.approvals.some((a) => a.memberId === viewer.id))
+        .map((p) => ({
+          id: p.id,
+          kind: p.kind,
+          title: p.title,
+          description: p.description,
+          amountCents: p.amountCents,
+          requestedBy: p.proposedBy?.name ?? null,
+          approvals: p.approvals.filter((a) => a.decision === 'APPROVE').length,
+          required: p.requiredApprovals,
+          recipients: p.recipients.map((r) => ({ name: r.name, receiver: r.receiver, amountCents: r.amountCents })),
+          flags: p.flags ? (JSON.parse(p.flags) as { message: string }[]).map((f) => f.message) : [],
+        }))
+    : []
 
   // Deterministic opening brief for the AI Treasurer panel: facts from the ledger, no model call.
   const approverCount = collective.members.filter((m) => canApprove(m.role)).length
@@ -100,7 +112,6 @@ async function CollectiveContent({
             </span>
             <span className="text-xs text-muted">· shared by all demo treasuries; in real use each group connects its own</span>
           </div>
-          <NotificationsCard key={viewer.id} collectiveId={collective.id} items={notifications.items} headSeq={notifications.headSeq} />
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:items-end">
           <div className="flex flex-wrap gap-2 sm:justify-end">
@@ -134,6 +145,13 @@ async function CollectiveContent({
         ))}
       </div>
 
+      {(pendingForMe.length > 0 || notifications.items.length > 0) && (
+        <div className="mt-4 flex flex-wrap items-start gap-2">
+          <ApprovalsPill key={`a-${viewer.id}`} items={pendingForMe} currency={cur} />
+          <NotificationsCard key={viewer.id} collectiveId={collective.id} items={notifications.items} headSeq={notifications.headSeq} />
+        </div>
+      )}
+
       {justCreated && (
         <div className="mt-6 flex items-start gap-3 rounded-[14px] border border-accent/25 bg-accent-soft px-4 py-3 text-sm text-accent">
           <PartyPopper size={18} className="mt-0.5 shrink-0" />
@@ -146,17 +164,6 @@ async function CollectiveContent({
         </div>
       )}
 
-      {needsMe > 0 && (
-        <a
-          href="#requests"
-          className="mt-6 flex items-center justify-between gap-3 rounded-[14px] border border-amber/25 bg-amber-soft px-4 py-3 text-sm text-amber transition hover:border-amber/50"
-        >
-          <span className="flex items-center gap-2 font-medium">
-            <BellRing size={16} /> {needsMe} request{needsMe === 1 ? ' needs' : 's need'} your sign-off
-          </span>
-          <span className="text-xs">Review →</span>
-        </a>
-      )}
 
       <TreasurerPanel collectiveId={collective.id} kind={collective.kind} currency={cur} brief={brief} />
 

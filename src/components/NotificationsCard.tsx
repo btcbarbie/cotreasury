@@ -60,7 +60,7 @@ export function NotificationsCard({ collectiveId, items, headSeq }: { collective
   const shown = expanded ? items : items.slice(0, SHOW)
 
   return (
-    <div ref={ref} className="relative mt-3 w-fit">
+    <div ref={ref} className="relative w-fit">
       <button
         onClick={() => (open ? close() : openList())}
         className="inline-flex items-center gap-2 rounded-full border border-dashed border-amber/60 bg-amber-soft/60 px-3 py-1 text-sm font-medium text-amber transition hover:bg-amber-soft"
