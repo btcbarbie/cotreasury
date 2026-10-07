@@ -10,7 +10,7 @@ type Member = { id: string; name: string; email: string; role: string }
 type Tier = { minCents: number; maxCents: number | null; requiredApprovals: number }
 
 export const MODES = [
-  { id: 'FIXED', label: 'Fixed approvers', hint: 'The approvers below vote on every payout.' },
+  { id: 'FIXED', label: 'Fixed approvers', hint: 'The approvers vote on every payout.' },
   { id: 'RANDOM', label: 'Random review panel', hint: 'Each payout gets reviewers drawn at random from all members, hidden from the requester until decided.' },
   { id: 'MIXED', label: 'Mixed panel', hint: 'One seat drawn from the approvers, the rest from all members, hidden until decided.' },
 ]
