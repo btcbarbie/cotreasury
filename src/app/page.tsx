@@ -46,7 +46,7 @@ export default function Home() {
       <section className="relative pt-14 pb-16 sm:pt-20 sm:pb-20">
         <div className="pointer-events-none absolute -top-10 right-0 -z-10 h-72 w-72 rounded-full bg-violet/10 blur-3xl sm:h-96 sm:w-96" />
         <div className="pointer-events-none absolute top-24 -left-10 -z-10 h-56 w-56 rounded-full bg-teal/10 blur-3xl" />
-        <span className="pill pill-violet mb-5">Shared purpose. Shared treasury. Collective control.</span>
+        <span className="pill pill-violet mb-5 !text-[11px] uppercase tracking-[0.08em]">Collective goal · Collective treasury · Collective control</span>
         <h1 className="text-5xl font-semibold leading-none tracking-tight sm:text-7xl">
           <span className="bg-gradient-to-r from-accent via-teal to-violet bg-clip-text text-transparent">CoTreasury</span>
         </h1>

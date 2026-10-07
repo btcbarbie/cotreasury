@@ -2,7 +2,7 @@
 
 **A treasury governed by the collective it serves.**
 
-*Shared purpose. Shared treasury. Collective control.*
+*Collective goal. Collective treasury. Collective control.*
 
 When people share a purpose, managing the money shouldn't depend on one person. CoTreasury gives groups a
 shared financial layer to coordinate contributions, understand their treasury, govern spending, and act

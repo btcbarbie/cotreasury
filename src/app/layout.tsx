@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "CoTreasury — a treasury governed by the collective it serves",
   description:
-    "Shared purpose. Shared treasury. Collective control. AI coordinates, people govern, PayPal moves the money, and the ledger remembers.",
+    "Collective goal. Collective treasury. Collective control. AI coordinates, people govern, PayPal moves the money, and the ledger remembers.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
