@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ArrowDownLeft, Bell, Check, FileText, Scale, Send, Target, X } from 'lucide-react'
 import { markNotificationsSeen } from '@/app/c/[id]/actions'
 import type { MemberNotification } from '@/lib/notifications'
@@ -25,80 +25,89 @@ const LOOK: Record<string, { Icon: typeof Bell; tone: string }> = {
 const SHOW = 6
 
 /**
- * "Since you were last here": significant events this member hasn't seen.
- * Seeing the card counts as viewing them, so they won't appear next visit;
- * the ledger and activity log keep the full history.
+ * A small pill: "3 new updates since you were last here". Opening it counts as
+ * viewing them; once closed, the pill is gone (and stays gone next visit). The
+ * ledger and activity log keep the full history.
  */
 export function NotificationsCard({ collectiveId, items, headSeq }: { collectiveId: string; items: MemberNotification[]; headSeq: number }) {
-  const [hidden, setHidden] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [seen, setSeen] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (items.length === 0) return
-    const t = setTimeout(() => void markNotificationsSeen(collectiveId, headSeq), 1500)
-    return () => clearTimeout(t)
-  }, [collectiveId, headSeq, items.length])
+    if (!open) return
+    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  })
 
-  if (hidden || items.length === 0) return null
+  function openList() {
+    setOpen(true)
+    void markNotificationsSeen(collectiveId, headSeq)
+  }
+  function close() {
+    setOpen(false)
+    setSeen(true)
+  }
+
+  if (items.length === 0 || (seen && !open)) return null
   const shown = expanded ? items : items.slice(0, SHOW)
 
   return (
-    <section className="card mt-6 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-        <div className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-lg bg-ink text-white">
-            <Bell size={14} />
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red ring-2 ring-white" />
-          </span>
-          Since you were last here
-          <span className="tabular text-sm font-normal text-muted">{items.length}</span>
+    <div ref={ref} className="relative mt-3 w-fit">
+      <button
+        onClick={() => (open ? close() : openList())}
+        className="inline-flex items-center gap-2 rounded-full border border-dashed border-amber/60 bg-amber-soft/60 px-3 py-1 text-sm font-medium text-amber transition hover:bg-amber-soft"
+      >
+        <Bell size={13} />
+        {items.length} new update{items.length === 1 ? '' : 's'} since you were last here
+      </button>
+
+      {open && (
+        <div className="card absolute left-0 top-full z-30 mt-2 w-[min(26rem,calc(100vw-2rem))] overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
+          <ul className="max-h-80 divide-y divide-line overflow-y-auto">
+            {shown.map((n) => {
+              const look = LOOK[n.action] ?? { Icon: Bell, tone: 'bg-bg text-muted' }
+              return (
+                <li key={n.seq} className="flex items-start gap-3 px-4 py-2.5">
+                  <span className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${look.tone}`}>
+                    <look.Icon size={12} />
+                  </span>
+                  <div className="min-w-0 flex-1 text-sm">
+                    <span className="font-medium">{n.actor}</span> {n.summary}
+                    <div className="text-xs text-faint">
+                      {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="flex items-center justify-between gap-3 border-t border-line bg-bg/60 px-4 py-2 text-xs">
+            {items.length > SHOW && !expanded ? (
+              <button className="text-muted hover:text-ink" onClick={() => setExpanded(true)}>
+                Show {items.length - SHOW} more
+              </button>
+            ) : (
+              <span className="text-muted">Marked as seen</span>
+            )}
+            <span className="flex gap-3">
+              <a href="#ledger" onClick={close} className="font-medium text-ink hover:underline">
+                Ledger
+              </a>
+              <a href="#activity" onClick={close} className="font-medium text-ink hover:underline">
+                Activity log
+              </a>
+            </span>
+          </div>
         </div>
-        <button
-          onClick={() => {
-            setHidden(true)
-            void markNotificationsSeen(collectiveId, headSeq)
-          }}
-          className="text-muted hover:text-ink"
-          aria-label="Dismiss"
-        >
-          <X size={18} />
-        </button>
-      </div>
-      <ul className="divide-y divide-line">
-        {shown.map((n) => {
-          const look = LOOK[n.action] ?? { Icon: Bell, tone: 'bg-bg text-muted' }
-          return (
-            <li key={n.seq} className="flex items-start gap-3 px-5 py-3">
-              <span className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${look.tone}`}>
-                <look.Icon size={14} />
-              </span>
-              <div className="min-w-0 flex-1 text-sm">
-                <span className="font-medium">{n.actor}</span> {n.summary}
-                <div className="mt-0.5 text-xs text-faint">
-                  {new Date(n.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                </div>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-bg/50 px-5 py-2.5 text-sm">
-        {items.length > SHOW && !expanded ? (
-          <button className="text-muted hover:text-ink" onClick={() => setExpanded(true)}>
-            Show {items.length - SHOW} more
-          </button>
-        ) : (
-          <span className="text-xs text-muted">These clear once you&apos;ve seen them.</span>
-        )}
-        <span className="flex gap-4">
-          <a href="#ledger" className="font-medium text-ink hover:underline">
-            Open ledger
-          </a>
-          <a href="#activity" className="font-medium text-ink hover:underline">
-            Open activity log
-          </a>
-        </span>
-      </div>
-    </section>
+      )}
+    </div>
   )
 }

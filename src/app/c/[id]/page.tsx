@@ -100,6 +100,7 @@ async function CollectiveContent({
             </span>
             <span className="text-xs text-muted">· shared by all demo treasuries; in real use each group connects its own</span>
           </div>
+          <NotificationsCard key={viewer.id} collectiveId={collective.id} items={notifications.items} headSeq={notifications.headSeq} />
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:items-end">
           <div className="flex flex-wrap gap-2 sm:justify-end">
@@ -115,8 +116,6 @@ async function CollectiveContent({
           </div>
         </div>
       </div>
-
-      <NotificationsCard key={viewer.id} collectiveId={collective.id} items={notifications.items} headSeq={notifications.headSeq} />
 
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s) => (
