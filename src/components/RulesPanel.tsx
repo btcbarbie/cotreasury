@@ -60,7 +60,7 @@ export function RulesPanel({
           )}
         </div>
         {ruleChangePending && (
-          <div className="mt-3 rounded-lg bg-violet-soft px-3 py-2 text-sm text-violet">A rule change is waiting for approval in Request funds.</div>
+          <div className="mt-3 rounded-lg bg-violet-soft px-3 py-2 text-sm text-violet">A rule change is waiting for approval in the Activity log.</div>
         )}
         <div className="mt-4 divide-y divide-line">
           {tiers.map((t, i) => (

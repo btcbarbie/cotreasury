@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
 import { CollectiveTabs } from '@/components/CollectiveTabs'
 import { ContributeButton } from '@/components/ContributeDialog'
+import { RequestPaymentButton } from '@/components/RequestPaymentButton'
 import { TreasurerPanel } from '@/components/TreasurerPanel'
 import { canApprove } from '@/lib/treasury'
 import { goalProgress } from '@/lib/goals'
@@ -88,6 +89,8 @@ async function CollectiveContent({
             viewerId={viewer.id}
             members={collective.members.map((m) => ({ id: m.id, name: m.name, role: m.role }))}
           />
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+          <RequestPaymentButton collectiveId={collective.id} currency={cur} />
           <ContributeButton
             collectiveId={collective.id}
             collectiveName={collective.name}
@@ -96,6 +99,7 @@ async function CollectiveContent({
             viewerName={viewer.name}
             goals={collective.goals.map((g) => ({ id: g.id, title: g.title }))}
           />
+          </div>
         </div>
       </div>
 
