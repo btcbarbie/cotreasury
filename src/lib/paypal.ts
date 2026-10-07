@@ -3,7 +3,8 @@ import { randomUUID } from 'crypto'
 // Thin server-side PayPal REST client. Credentials never reach the browser
 // except the public client id used by the JS SDK.
 
-const BASE = process.env.PAYPAL_API_BASE ?? 'https://api-m.sandbox.paypal.com'
+// Sandbox only, by design. There is deliberately no switch to live PayPal.
+const BASE = 'https://api-m.sandbox.paypal.com'
 
 let cached: { token: string; expiresAt: number } | null = null
 

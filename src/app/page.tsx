@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { connection } from 'next/server'
 import { ArrowUpRight, GraduationCap, Sparkles, Trophy, Users } from 'lucide-react'
 import { listCollectives } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
@@ -36,6 +37,7 @@ export default function Home() {
 }
 
 async function CollectiveGrid() {
+  await connection() // live balances: never prerender this list at build time
   const collectives = await listCollectives()
   return (
     <div className="grid gap-4 sm:grid-cols-2">
