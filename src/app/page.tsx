@@ -14,26 +14,26 @@ const KIND_META: Record<string, { label: string; Icon: typeof Users; tone: strin
 
 const PILLARS = [
   {
-    title: 'AI Treasurer',
-    body: 'Understands your treasury, tracks commitments, evaluates spending requests, and coordinates financial decisions.',
+    title: 'AI helps manage the money',
+    body: "See what's available, what's committed, and whether the group can afford a request.",
     Icon: Sparkles,
     tone: 'bg-violet-soft text-violet',
   },
   {
-    title: 'Collective Governance',
-    body: 'Define who can approve transactions and how much authority each decision requires.',
+    title: 'Your group makes the decisions',
+    body: 'Set who can approve spending and how many people need to say yes.',
     Icon: Scale,
     tone: 'bg-accent-soft text-accent',
   },
   {
-    title: 'PayPal Rails',
-    body: "Move approved transactions through PayPal's payment infrastructure.",
+    title: 'PayPal handles the payments',
+    body: 'When the group approves a payment, it goes through PayPal.',
     Icon: Send,
     tone: 'bg-blue-soft text-blue',
   },
   {
-    title: 'Shared Ledger',
-    body: "Keep the collective's financial state visible, traceable, and up to date.",
+    title: 'Everyone can see what happened',
+    body: 'Every confirmed contribution and payment appears in the shared record.',
     Icon: BookOpen,
     tone: 'bg-teal-soft text-teal',
   },
