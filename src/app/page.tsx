@@ -33,7 +33,7 @@ const PILLARS = [
   },
   {
     title: 'Everyone can see what happened',
-    body: 'Every confirmed contribution and payment appears in the shared record.',
+    body: 'A shared ledger.',
     Icon: BookOpen,
     tone: 'bg-teal-soft text-teal',
   },
