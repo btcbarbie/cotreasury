@@ -233,12 +233,12 @@ function TreasuryGrid({ collectives, demo }: { collectives: Awaited<ReturnType<t
             <p className="mt-1 text-sm text-muted line-clamp-2">{c.purpose}</p>
             <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line pt-4 text-sm">
               <div>
-                <div className="tabular text-lg font-semibold tracking-tight">{formatMoney(c.treasury.availableCents, c.currency)}</div>
-                <div className="text-xs text-muted">Available</div>
+                <div className="tabular text-lg font-semibold tracking-tight">{formatMoney(c.inflowCents, c.currency)}</div>
+                <div className="text-xs text-muted">Total inflow</div>
               </div>
               <div>
-                <div className="tabular text-lg font-semibold tracking-tight">{c.verifiedCount}</div>
-                <div className="text-xs text-muted">Verified records</div>
+                <div className="tabular text-lg font-semibold tracking-tight">{formatMoney(c.treasury.availableCents, c.currency)}</div>
+                <div className="text-xs text-muted">Available balance</div>
               </div>
               <div>
                 <div className="tabular text-lg font-semibold tracking-tight">{c.memberCount}</div>

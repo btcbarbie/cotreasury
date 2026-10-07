@@ -35,7 +35,7 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
     currency: c.currency,
     memberCount: c._count.members,
     eventCount: c._count.events,
-    verifiedCount: c.entries.filter((e) => e.status === 'CONFIRMED').length,
+    inflowCents: c.entries.filter((e) => e.direction === 'IN' && e.status === 'CONFIRMED').reduce((s, e) => s + e.amountCents, 0),
     admin: c.members[0] ?? null,
     treasury: computeTreasury(c.entries, c.proposals),
   }))
