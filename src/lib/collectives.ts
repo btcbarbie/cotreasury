@@ -21,7 +21,8 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
     include: {
       entries: { select: { direction: true, status: true, amountCents: true } },
       proposals: { select: { status: true, amountCents: true } },
-      _count: { select: { members: true } },
+      _count: { select: { members: true, events: true } },
+      members: { where: { role: 'ADMIN' }, select: { id: true, name: true }, take: 1 },
     },
   })
   return collectives.map((c) => ({
@@ -31,6 +32,9 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
     kind: c.kind,
     currency: c.currency,
     memberCount: c._count.members,
+    eventCount: c._count.events,
+    verifiedCount: c.entries.filter((e) => e.status === 'CONFIRMED').length,
+    admin: c.members[0] ?? null,
     treasury: computeTreasury(c.entries, c.proposals),
   }))
 }
@@ -41,6 +45,8 @@ export async function getCollectiveView(id: string) {
     include: {
       members: { orderBy: { createdAt: 'asc' } },
       tiers: { orderBy: { minCents: 'asc' } },
+      goals: { orderBy: { createdAt: 'asc' } },
+      events: { orderBy: { seq: 'desc' }, take: 100 },
       entries: { orderBy: { createdAt: 'desc' }, include: { member: { select: { name: true } } } },
       proposals: {
         orderBy: { createdAt: 'desc' },

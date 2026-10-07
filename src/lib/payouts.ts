@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { computeTreasury } from './treasury'
 import { formatMoney } from './money'
 import { createPayoutBatch, getPayoutBatch, PayPalError, type PayoutItem } from './paypal'
+import { recordEvent } from './audit'
 
 // Approved spending → PayPal Payouts. The only code path that moves money out.
 // Recipient and ledger state change only from PayPal's own answers: the batch
@@ -81,6 +82,12 @@ export async function executePayout(proposalId: string): Promise<{ ok: boolean; 
       })),
     })
     await prisma.proposal.update({ where: { id: p.id }, data: { paypalBatchId: batch.batch_header.payout_batch_id } })
+    await recordEvent(c.id, {
+      actor: 'CoTreasury',
+      action: 'PAYOUT_SENT',
+      summary: `sent ${formatMoney(p.amountCents, c.currency)} for "${p.title}" to PayPal Payouts (batch ${batch.batch_header.payout_batch_id})`,
+      data: { proposalId: p.id, batchId: batch.batch_header.payout_batch_id, attempt: p.payoutAttempts },
+    })
     return { ok: true }
   } catch (e) {
     const reason =
@@ -100,6 +107,8 @@ export async function executePayout(proposalId: string): Promise<{ ok: boolean; 
 }
 
 async function fail(proposalId: string, reason: string) {
+  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { collectiveId: true, title: true } })
+  if (p) await recordEvent(p.collectiveId, { actor: 'CoTreasury', action: 'PAYOUT_FAILED', summary: `payout for "${p.title}" failed: ${reason}`, data: { proposalId } })
   await prisma.$transaction([
     prisma.proposal.update({ where: { id: proposalId }, data: { status: 'FAILED', failureReason: reason } }),
     prisma.payoutRecipient.updateMany({ where: { proposalId, status: { in: ['PENDING', 'SENT'] } }, data: { status: 'FAILED' } }),
@@ -116,6 +125,16 @@ export async function applyPayoutItem(item: PayoutItem, source: 'PAYPAL_WEBHOOK'
   if (!r || r.status === outcome.recipient) return
   if (['SUCCEEDED', 'FAILED', 'RETURNED'].includes(r.status) && outcome.recipient !== 'RETURNED') return // terminal
 
+  const p = await prisma.proposal.findUnique({ where: { id: r.proposalId }, include: { collective: { select: { currency: true } } } })
+  if (p) {
+    const verb = { SUCCEEDED: 'paid', UNCLAIMED: 'sent (awaiting claim)', FAILED: 'could not pay', RETURNED: 'returned the payment to', SENT: 'is sending' }[outcome.recipient]
+    await recordEvent(p.collectiveId, {
+      actor: 'PayPal',
+      action: `PAYOUT_${outcome.recipient}`,
+      summary: `${verb} ${formatMoney(r.amountCents, p.collective.currency)} ${outcome.recipient === 'RETURNED' ? '' : 'to '}${r.name} for "${p.title}"${source === 'PAYPAL_WEBHOOK' ? ' (verified webhook)' : ' (status check)'}`,
+      data: { proposalId: p.id, recipientId: r.id, payoutItemId: item.payout_item_id, status: item.transaction_status, source },
+    })
+  }
   await prisma.$transaction([
     prisma.payoutRecipient.update({ where: { id: r.id }, data: { status: outcome.recipient, paypalItemId: item.payout_item_id } }),
     prisma.ledgerEntry.updateMany({

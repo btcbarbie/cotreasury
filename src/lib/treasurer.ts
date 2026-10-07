@@ -3,6 +3,7 @@ import { prisma } from './prisma'
 import { computeTreasury, tierFor, canApprove } from './treasury'
 import { formatMoney } from './money'
 import { assessSpend, type Flag } from './governance'
+import { goalProgress } from './goals'
 
 // The AI Treasurer. It can READ the ledger and run deterministic checks, and it
 // can DRAFT a spending request. It cannot approve, submit, change rules or move
@@ -32,7 +33,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: 'get_treasury_state',
     description:
-      "Read the collective's current financial state from the ledger: balance, committed and pending money, available-to-spend, approval rules, approvers, open requests and recent ledger activity. Call this before stating any figure.",
+      "Read the collective's current financial state from the ledger: balance, committed and pending money, available-to-spend, goals with who has and hasn't paid, approval rules, approvers, open requests and recent ledger activity. Call this before stating any figure.",
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
     strict: true,
   },
@@ -96,6 +97,7 @@ async function loadState(collectiveId: string) {
     where: { id: collectiveId },
     include: {
       members: true,
+      goals: true,
       tiers: { orderBy: { minCents: 'asc' } },
       entries: { orderBy: { createdAt: 'desc' } },
       proposals: { include: { approvals: true } },
@@ -131,6 +133,16 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
           'Rule and approver changes must be approved at the strictest tier before they take effect',
         ],
         member_count: c.members.length,
+        goals: goalProgress(c.goals, c.members, c.entries).map((g) => ({
+          title: g.title,
+          type: g.kind === 'MONTHLY' ? `monthly pledge (month ${g.monthsDue})` : 'one-off goal',
+          per_member: formatMoney(g.perMemberCents, cur),
+          due: g.dueDate?.slice(0, 10) ?? null,
+          collected: formatMoney(g.collectedCents, cur),
+          target: formatMoney(g.targetCents, cur),
+          paid_in_full: g.members.filter((m) => m.upToDate).map((m) => m.name),
+          not_paid_in_full: g.members.filter((m) => !m.upToDate).map((m) => `${m.name} (paid ${formatMoney(m.paidCents, cur)})`),
+        })),
         open_requests: c.proposals
           .filter((p) => ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(p.status))
           .map((p) => ({

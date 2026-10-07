@@ -8,6 +8,8 @@ import { canApprove } from '@/lib/treasury'
 import { assessSpend, describeRuleChange, ruleChangeApprovals, validateRules, type RulesPayload } from '@/lib/governance'
 import type { DraftRequest } from '@/lib/treasurer'
 import { executePayout, retryPayout } from '@/lib/payouts'
+import { recordEvent } from '@/lib/audit'
+import { formatMoney } from '@/lib/money'
 
 // Demo-mode identity switch: lets a judge act as different members (e.g. three
 // approvers) without separate logins. Not an authentication mechanism.
@@ -42,7 +44,7 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
   const a = await assessSpend(collectiveId, recipients, viewer.id)
   if (!a.affordable) return { ok: false, error: 'This would exceed the money available to spend.' }
 
-  await prisma.proposal.create({
+  const created = await prisma.proposal.create({
     data: {
       collectiveId,
       kind: 'SPEND',
@@ -55,6 +57,12 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
       flags: JSON.stringify(a.flags),
       recipients: { create: recipients.map((r) => ({ ...r, receiverType: 'EMAIL' })) },
     },
+  })
+  await recordEvent(collectiveId, {
+    actor: viewer.name,
+    action: 'REQUEST_CREATED',
+    summary: `requested ${formatMoney(a.amountCents, a.currency)} for "${created.title}" (needs ${a.requiredApprovals} approval${a.requiredApprovals === 1 ? '' : 's'})`,
+    data: { proposalId: created.id, amountCents: a.amountCents, recipients: recipients.map((r) => r.receiver), flags: a.flags.map((f) => f.code) },
   })
   refresh()
   return { ok: true }
@@ -81,7 +89,7 @@ export async function proposeRuleChange(collectiveId: string, rules: RulesPayloa
   const lines = describeRuleChange(current, rules, new Map(c.members.map((m) => [m.id, m.name])), c.currency)
   if (lines.length === 0) return { ok: false, error: 'Nothing changed.' }
 
-  await prisma.proposal.create({
+  const ruleProposal = await prisma.proposal.create({
     data: {
       collectiveId,
       kind: 'RULE_CHANGE',
@@ -92,6 +100,12 @@ export async function proposeRuleChange(collectiveId: string, rules: RulesPayloa
       proposedById: viewer.id,
       changePayload: JSON.stringify(rules),
     },
+  })
+  await recordEvent(collectiveId, {
+    actor: viewer.name,
+    action: 'RULE_CHANGE_PROPOSED',
+    summary: `proposed a rule change: ${lines.join('; ')}`,
+    data: { proposalId: ruleProposal.id, rules },
   })
   refresh()
   return { ok: true }
@@ -115,6 +129,33 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
     await tx.approval.create({ data: { proposalId, memberId: viewer.id, decision } })
     const approvals = await tx.approval.count({ where: { proposalId, decision: 'APPROVE' } })
     const status = decision === 'REJECT' ? 'REJECTED' : approvals >= proposal.requiredApprovals ? 'APPROVED' : 'PENDING_APPROVAL'
+    await recordEvent(
+      proposal.collectiveId,
+      {
+        actor: viewer.name,
+        action: decision === 'APPROVE' ? 'VOTE_APPROVE' : 'VOTE_REJECT',
+        summary: `${decision === 'APPROVE' ? 'approved' : 'rejected'} "${proposal.title}" (${approvals} of ${proposal.requiredApprovals})`,
+        data: { proposalId, decision },
+      },
+      tx,
+    )
+    if (status === 'APPROVED' || status === 'REJECTED') {
+      await recordEvent(
+        proposal.collectiveId,
+        {
+          actor: 'CoTreasury',
+          action: status === 'APPROVED' ? (proposal.kind === 'RULE_CHANGE' ? 'RULES_CHANGED' : 'REQUEST_APPROVED') : 'REQUEST_REJECTED',
+          summary:
+            status === 'REJECTED'
+              ? `"${proposal.title}" was rejected`
+              : proposal.kind === 'RULE_CHANGE'
+                ? `new spending rules took effect: ${proposal.description?.replace(/\n/g, '; ')}`
+                : `"${proposal.title}" reached ${proposal.requiredApprovals} approval${proposal.requiredApprovals === 1 ? '' : 's'}`,
+          data: { proposalId },
+        },
+        tx,
+      )
+    }
     if (status === proposal.status) return
     if (status === 'APPROVED' && proposal.kind === 'RULE_CHANGE' && proposal.changePayload) {
       // Apply the approved rules atomically with the final approval.
@@ -150,4 +191,45 @@ export async function retryRequestPayout(proposalId: string): Promise<Result> {
   const r = await retryPayout(proposalId)
   refresh()
   return r.ok ? { ok: true } : { ok: false, error: r.error ?? 'Retry failed.' }
+}
+
+/** Approvers set what the collective is saving for. Goals don't move money, so no vote is needed. */
+export async function addGoal(
+  collectiveId: string,
+  input: { title: string; kind: 'TARGET' | 'MONTHLY'; perMemberCents: number; dueDate?: string | null },
+): Promise<Result> {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer || !canApprove(viewer.role)) return { ok: false, error: 'Only approvers can add goals.' }
+  const title = input.title?.trim() ?? ''
+  if (title.length < 3 || title.length > 80) return { ok: false, error: 'Give the goal a short name.' }
+  if (!Number.isInteger(input.perMemberCents) || input.perMemberCents < 100 || input.perMemberCents > 10_000_000) {
+    return { ok: false, error: 'Enter an amount per member.' }
+  }
+  const kind = input.kind === 'MONTHLY' ? 'MONTHLY' : 'TARGET'
+  const due = kind === 'TARGET' && input.dueDate ? new Date(input.dueDate) : null
+  if (due && isNaN(due.getTime())) return { ok: false, error: 'Pick a valid due date.' }
+  const now = new Date()
+  const goal = await prisma.goal.create({
+    data: {
+      collectiveId,
+      title,
+      kind,
+      perMemberCents: input.perMemberCents,
+      dueDate: due,
+      startMonth: kind === 'MONTHLY' ? new Date(now.getFullYear(), now.getMonth(), 1) : null,
+    },
+  })
+  await recordEvent(collectiveId, {
+    actor: viewer.name,
+    action: 'GOAL_CREATED',
+    summary: `set a goal: ${title} (${formatMoney(input.perMemberCents, 'USD')} per member${kind === 'MONTHLY' ? ' each month' : due ? `, due ${due.toDateString()}` : ''})`,
+    data: { goalId: goal.id },
+  })
+  refresh()
+  return { ok: true }
+}
+
+export async function checkIntegrity(collectiveId: string) {
+  const { verifyChain } = await import('@/lib/audit')
+  return verifyChain(collectiveId)
 }

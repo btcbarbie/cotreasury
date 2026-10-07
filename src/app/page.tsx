@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { connection } from 'next/server'
-import { ArrowRight, ArrowUpRight, BookOpen, GraduationCap, HandHeart, Plus, Scale, Send, Sparkles, Trophy, Users } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, GraduationCap, HandHeart, Link2, Plus, Scale, Send, ShieldCheck, Sparkles, Trophy, UserX, Users } from 'lucide-react'
 import { listCollectives, myTreasuryIds } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 
@@ -36,6 +36,29 @@ const PILLARS = [
     body: "Keep the collective's financial state visible, traceable, and up to date.",
     Icon: BookOpen,
     tone: 'bg-teal-soft text-teal',
+  },
+]
+
+const PRINCIPLES = [
+  {
+    title: 'AI reads, people decide',
+    body: 'The AI Treasurer reads the ledger and drafts requests. Fixed rules do the maths, and a person makes every decision.',
+    Icon: Sparkles,
+  },
+  {
+    title: 'No self-approval',
+    body: 'Whoever asks to spend can never approve it. That includes the admin.',
+    Icon: UserX,
+  },
+  {
+    title: 'PayPal confirms every dollar',
+    body: 'Money only counts once PayPal confirms it with a signed webhook. Nobody types in “paid”.',
+    Icon: BadgeCheck,
+  },
+  {
+    title: 'History you can check',
+    body: 'Every action is sealed to the one before it. If anyone edits the past, the integrity check fails.',
+    Icon: Link2,
   },
 ]
 
@@ -91,12 +114,33 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Principles */}
+      <section className="border-t border-line py-14 sm:py-16">
+        <div className="flex items-center gap-2 text-sm font-medium text-accent">
+          <ShieldCheck size={16} /> Built for trust
+        </div>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">How CoTreasury keeps everyone honest</h2>
+        <div className="mt-8 grid gap-x-8 gap-y-6 sm:grid-cols-2">
+          {PRINCIPLES.map((p) => (
+            <div key={p.title} className="flex gap-4">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink text-white">
+                <p.Icon size={18} />
+              </span>
+              <div>
+                <div className="font-semibold tracking-tight">{p.title}</div>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{p.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Live demo treasuries */}
       <section id="treasuries" className="scroll-mt-20 border-t border-line py-14 sm:py-16">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Explore a live treasury</h2>
-            <p className="mt-2 text-muted">Sandbox demos running on PayPal. Switch between members to try contributing, requesting and approving.</p>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Try a demo treasury</h2>
+            <p className="mt-2 text-muted">Made-up treasuries with months of history, running on PayPal&apos;s sandbox. Open one as its admin, or view it as any member.</p>
           </div>
         </div>
         <div className="mt-8">
@@ -131,19 +175,18 @@ async function MyTreasuries() {
 
 async function DemoGrid() {
   await connection() // live balances: never prerender this list at build time
-  return <TreasuryGrid collectives={await listCollectives({ demo: true })} />
+  return <TreasuryGrid collectives={await listCollectives({ demo: true })} demo />
 }
 
-function TreasuryGrid({ collectives }: { collectives: Awaited<ReturnType<typeof listCollectives>> }) {
+function TreasuryGrid({ collectives, demo }: { collectives: Awaited<ReturnType<typeof listCollectives>>; demo?: boolean }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {collectives.map((c) => {
         const meta = KIND_META[c.kind] ?? { label: 'Treasury', Icon: Users, tone: 'bg-bg text-muted', bar: 'from-ink to-muted' }
         return (
-          <Link
+          <div
             key={c.id}
-            href={`/c/${c.id}`}
-            className="card group relative overflow-hidden p-5 transition hover:border-line-strong hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]"
+            className="card group relative flex flex-col overflow-hidden p-5 transition hover:border-line-strong hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]"
           >
             <span className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${meta.bar}`} />
             <div className="flex items-start justify-between gap-3">
@@ -153,20 +196,43 @@ function TreasuryGrid({ collectives }: { collectives: Awaited<ReturnType<typeof 
                 </span>
                 {meta.label}
               </div>
-              <ArrowUpRight size={16} className="text-faint transition group-hover:text-ink" />
+              <Link href={`/c/${c.id}`} aria-label={`Open ${c.name}`}>
+                <ArrowUpRight size={16} className="text-faint transition group-hover:text-ink" />
+              </Link>
             </div>
-            <div className="mt-3 text-lg font-semibold tracking-tight">{c.name}</div>
+            <Link href={`/c/${c.id}`} className="mt-3 text-lg font-semibold tracking-tight hover:underline">
+              {c.name}
+            </Link>
             <p className="mt-1 text-sm text-muted line-clamp-2">{c.purpose}</p>
-            <div className="mt-5 flex items-end justify-between">
+            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line pt-4 text-sm">
               <div>
+                <div className="tabular text-lg font-semibold tracking-tight">{formatMoney(c.treasury.availableCents, c.currency)}</div>
                 <div className="text-xs text-muted">Available</div>
-                <div className="tabular text-2xl font-semibold tracking-tight">{formatMoney(c.treasury.availableCents, c.currency)}</div>
               </div>
-              <div className="flex items-center gap-1 text-sm text-muted">
-                <Users size={14} /> {c.memberCount}
+              <div>
+                <div className="tabular text-lg font-semibold tracking-tight">{c.verifiedCount}</div>
+                <div className="text-xs text-muted">Verified records</div>
+              </div>
+              <div>
+                <div className="tabular text-lg font-semibold tracking-tight">{c.memberCount}</div>
+                <div className="text-xs text-muted">Members</div>
               </div>
             </div>
-          </Link>
+            {demo && c.admin ? (
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <a href={`/c/${c.id}/as/${c.admin.id}`} className="btn btn-primary !h-9">
+                  Open as {c.admin.name.split(' ')[0]}, admin
+                </a>
+                <Link href={`/c/${c.id}`} className="text-sm text-muted hover:text-ink">
+                  View as another member →
+                </Link>
+              </div>
+            ) : (
+              <Link href={`/c/${c.id}`} className="btn btn-ghost mt-5 !h-9 w-fit">
+                Open treasury
+              </Link>
+            )}
+          </div>
         )
       })}
     </div>

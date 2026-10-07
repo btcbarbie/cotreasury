@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { MY_TREASURIES_COOKIE, myTreasuryIds, viewerCookieName } from '@/lib/collectives'
 import { validateRules } from '@/lib/governance'
+import { recordEvent } from '@/lib/audit'
+import { formatMoney } from '@/lib/money'
 
 export type NewTreasury = {
   name: string
@@ -65,6 +67,21 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
     include: { members: true },
   })
   const admin = collective.members.find((m) => m.role === 'ADMIN')!
+  const approverNames = collective.members.filter((m) => m.role !== 'MEMBER').map((m) => m.name)
+  await recordEvent(collective.id, {
+    actor: admin.name,
+    action: 'TREASURY_CREATED',
+    summary: `opened the treasury with ${collective.members.length} people; approvers: ${approverNames.join(', ')}`,
+    data: { purpose, paypalEmail },
+  })
+  await recordEvent(collective.id, {
+    actor: admin.name,
+    action: 'RULES_SET',
+    summary: `set the spending rules: ${tiers
+      .map((t) => `${t.maxCents === null ? `${formatMoney(t.minCents, 'USD')}+` : `${formatMoney(t.minCents, 'USD')}–${formatMoney(t.maxCents, 'USD')}`} needs ${t.requiredApprovals}`)
+      .join('; ')}${input.newPayeeRule ? '; +1 for new recipients' : ''}`,
+    data: { tiers, newPayeeRule: !!input.newPayeeRule },
+  })
 
   const jar = await cookies()
   const mine = [...new Set([...(await myTreasuryIds()), collective.id])].slice(-20)

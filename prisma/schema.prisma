@@ -31,6 +31,8 @@ model Collective {
   tiers       GovernanceTier[]
   entries     LedgerEntry[]
   proposals   Proposal[]
+  goals       Goal[]
+  events      AuditEvent[]
 }
 
 model Member {
@@ -75,6 +77,7 @@ model LedgerEntry {
   memberId     String?
   proposalId   String?
   payoutRecipientId String? // PAYOUT rows: which recipient of the proposal this pays
+  goalId       String?   // CONTRIBUTION rows: which goal the money is for
   paypalRef    String?   // capture id / payout item id / transaction id
   createdAt    DateTime  @default(now())
   confirmedAt  DateTime?
@@ -150,4 +153,38 @@ model WebhookEvent {
   payload     String
   receivedAt  DateTime  @default(now())
   processedAt DateTime?
+}
+
+// What the collective is saving for. TARGET: a one-off amount per member by a
+// due date. MONTHLY: a recurring pledge per member.
+model Goal {
+  id                  String    @id @default(cuid())
+  collectiveId        String
+  title               String
+  kind                String    // "TARGET" | "MONTHLY"
+  perMemberCents      Int
+  dueDate             DateTime? // TARGET only
+  startMonth          DateTime? // MONTHLY only: first month of the pledge
+  createdAt           DateTime  @default(now())
+
+  collective          Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
+}
+
+// Tamper-evident activity log: each event's hash covers its own content and
+// the previous event's hash, so editing or deleting history breaks the chain.
+model AuditEvent {
+  id           String   @id @default(cuid())
+  collectiveId String
+  seq          Int
+  actor        String   // display name, "PayPal" or "AI Treasurer"
+  action       String   // e.g. "CONTRIBUTION_CONFIRMED", "VOTE_APPROVE"
+  summary      String
+  data         String   // canonical JSON
+  createdAt    DateTime @default(now())
+  prevHash     String
+  hash         String
+
+  collective   Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
+
+  @@unique([collectiveId, seq])
 }

@@ -8,15 +8,17 @@ import type { DraftRequest, TreasurerReply } from '@/lib/treasurer'
 
 type Turn = { role: 'user'; content: string } | ({ role: 'assistant'; content: string } & Omit<TreasurerReply, 'answer'>)
 
+const DEFAULT_SUGGESTIONS = ["Who hasn't paid yet?", 'How much can we spend right now?', 'Who needs to approve a $1,000 payment?']
+
 const SUGGESTIONS: Record<string, string[]> = {
   SCHOLARSHIP_FUND: [
     'Can we fund 4 scholarships at $1,500 each?',
+    "Who hasn't paid for the Fall 2026 awards?",
     'Who needs to sign off on a $6,000 award?',
-    'How much have members contributed recently?',
   ],
   BOOSTER_CLUB: [
     'Can we afford a $1,850 bus to the regional finals?',
-    'What is committed but not yet paid?',
+    "Who still owes season dues?",
     'Who approves spending over $2,000?',
   ],
 }
@@ -137,7 +139,7 @@ export function TreasurerPanel({ collectiveId, kind, currency, brief }: { collec
       <div className="px-5 pb-5 pt-4">
         {turns.length === 0 && (
           <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto">
-            {(SUGGESTIONS[kind] ?? SUGGESTIONS.SCHOLARSHIP_FUND).map((s) => (
+            {(SUGGESTIONS[kind] ?? DEFAULT_SUGGESTIONS).map((s) => (
               <button
                 key={s}
                 onClick={() => ask(s)}

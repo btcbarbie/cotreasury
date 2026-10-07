@@ -8,6 +8,10 @@ import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
 import { NewRequestForm } from './NewRequestForm'
+import { OverviewPanel, type MoneySummary } from './OverviewPanel'
+import { AttentionPanel, attentionItems } from './AttentionPanel'
+import { ActivityPanel, type ActivityEvent } from './ActivityPanel'
+import type { GoalProgress } from '@/lib/goals'
 import type { LedgerRow } from './LedgerGrid'
 
 // AG Grid touches window on import; render it client-side only.
@@ -36,7 +40,7 @@ type Proposal = {
   failureReason: string | null
 }
 
-const TABS = ['Requests', 'Ledger', 'Rules', 'Members'] as const
+const TABS = ['Overview', 'Needs attention', 'Requests', 'Ledger', 'Activity', 'Rules', 'Members'] as const
 type Tab = (typeof TABS)[number]
 
 export function CollectiveTabs(props: {
@@ -45,12 +49,23 @@ export function CollectiveTabs(props: {
   viewerId: string
   viewerRole: string
   newPayeeRule: boolean
+  summary: MoneySummary
+  goals: GoalProgress[]
+  events: ActivityEvent[]
   members: Member[]
   tiers: Tier[]
   entries: LedgerRow[]
   proposals: Proposal[]
 }) {
-  const [tab, setTab] = useState<Tab>('Requests')
+  const [tab, setTab] = useState<Tab>('Overview')
+  const attention = attentionItems({
+    proposals: props.proposals,
+    entries: props.entries,
+    goals: props.goals,
+    viewerId: props.viewerId,
+    viewerRole: props.viewerRole,
+    currency: props.currency,
+  })
   // The approver inbox banner links to #requests: open that tab when it's followed.
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -60,7 +75,9 @@ export function CollectiveTabs(props: {
     return () => document.removeEventListener('click', onClick)
   }, [])
   const counts: Partial<Record<Tab, number>> = {
+    'Needs attention': attention.length || undefined,
     Requests: props.proposals.filter((p) => p.status === 'PENDING_APPROVAL').length || undefined,
+    Activity: props.events.length || undefined,
     Ledger: props.entries.length,
     Members: props.members.length,
   }
@@ -83,6 +100,18 @@ export function CollectiveTabs(props: {
       </div>
 
       <div className="mt-5">
+        {tab === 'Overview' && (
+          <OverviewPanel
+            collectiveId={props.collectiveId}
+            currency={props.currency}
+            summary={props.summary}
+            goals={props.goals}
+            canManage={props.viewerRole === 'APPROVER' || props.viewerRole === 'ADMIN'}
+            viewerId={props.viewerId}
+          />
+        )}
+        {tab === 'Needs attention' && <AttentionPanel items={attention} onOpenRequests={() => setTab('Requests')} />}
+        {tab === 'Activity' && <ActivityPanel collectiveId={props.collectiveId} events={props.events} />}
         {tab === 'Requests' && (
           <RequestsPanel
             collectiveId={props.collectiveId}

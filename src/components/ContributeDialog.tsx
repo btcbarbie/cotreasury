@@ -48,14 +48,27 @@ type Phase =
   | { kind: 'done'; source: string }
   | { kind: 'error'; message: string }
 
-export function ContributeButton(props: { collectiveId: string; collectiveName: string; currency: string; clientId: string; viewerName: string }) {
-  const [open, setOpen] = useState(false)
+type GoalOption = { id: string; title: string }
+
+export function ContributeButton(props: { collectiveId: string; collectiveName: string; currency: string; clientId: string; viewerName: string; goals: GoalOption[] }) {
+  const [open, setOpen] = useState<{ goalId: string | null; amountCents: number } | null>(null)
+
+  // Goal cards ask to open the dialog pre-filled with their goal and what the viewer still owes.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const d = (e as CustomEvent<{ goalId: string; amountCents: number }>).detail
+      setOpen({ goalId: d.goalId, amountCents: d.amountCents })
+    }
+    window.addEventListener('cotreasury:contribute', onOpen)
+    return () => window.removeEventListener('cotreasury:contribute', onOpen)
+  }, [])
+
   return (
     <>
-      <button className="btn btn-primary" onClick={() => setOpen(true)}>
+      <button className="btn btn-primary" onClick={() => setOpen({ goalId: props.goals[0]?.id ?? null, amountCents: 5000 })}>
         Contribute
       </button>
-      {open && <ContributeDialog {...props} onClose={() => setOpen(false)} />}
+      {open && <ContributeDialog {...props} initialGoalId={open.goalId} initialAmountCents={open.amountCents} onClose={() => setOpen(null)} />}
     </>
   )
 }
@@ -66,6 +79,9 @@ function ContributeDialog({
   currency,
   clientId,
   viewerName,
+  goals,
+  initialGoalId,
+  initialAmountCents,
   onClose,
 }: {
   collectiveId: string
@@ -73,10 +89,14 @@ function ContributeDialog({
   currency: string
   clientId: string
   viewerName: string
+  goals: GoalOption[]
+  initialGoalId: string | null
+  initialAmountCents: number
   onClose: () => void
 }) {
-  const [amountCents, setAmountCents] = useState(5000)
-  const [custom, setCustom] = useState('')
+  const [amountCents, setAmountCents] = useState(initialAmountCents)
+  const [custom, setCustom] = useState(PRESETS.includes(initialAmountCents) ? '' : (initialAmountCents / 100).toFixed(2))
+  const [goalId, setGoalId] = useState<string | null>(initialGoalId)
   const [phase, setPhase] = useState<Phase>({ kind: 'amount' })
   const [sdkReady, setSdkReady] = useState(false)
   const [venmo, setVenmo] = useState(false)
@@ -109,12 +129,12 @@ function ContributeDialog({
     const res = await fetch(`/api/collectives/${collectiveId}/contribute/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amountCents: cents }),
+      body: JSON.stringify({ amountCents: cents, goalId }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error ?? 'Could not start payment')
     return { orderId: data.orderId }
-  }, [collectiveId])
+  }, [collectiveId, goalId])
 
   const onApprove = useCallback(
     async (data: { orderId: string }) => {
@@ -204,7 +224,20 @@ function ContributeDialog({
 
         {phase.kind === 'amount' && (
           <>
-            <div className="mt-6 grid grid-cols-4 gap-2">
+            {goals.length > 0 && (
+              <label className="mt-5 block">
+                <span className="label">What is it for?</span>
+                <select className="input mt-1.5" value={goalId ?? ''} onChange={(e) => setGoalId(e.target.value || null)}>
+                  {goals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                  <option value="">General fund</option>
+                </select>
+              </label>
+            )}
+            <div className="mt-5 grid grid-cols-4 gap-2">
               {PRESETS.map((p) => (
                 <button
                   key={p}

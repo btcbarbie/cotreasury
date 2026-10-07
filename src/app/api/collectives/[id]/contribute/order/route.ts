@@ -9,20 +9,22 @@ const MAX_CENTS = 1_000_000
 
 export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id]/contribute/order'>) {
   const { id } = await ctx.params
-  const { amountCents } = (await req.json()) as { amountCents: number }
+  const { amountCents, goalId } = (await req.json()) as { amountCents: number; goalId?: string | null }
   if (!Number.isInteger(amountCents) || amountCents < MIN_CENTS || amountCents > MAX_CENTS) {
     return NextResponse.json({ error: 'Enter an amount between $1 and $10,000.' }, { status: 400 })
   }
-  const collective = await prisma.collective.findUnique({ where: { id } })
+  const collective = await prisma.collective.findUnique({ where: { id }, include: { goals: true } })
   const viewer = await getViewer(id)
   if (!collective || !viewer) return NextResponse.json({ error: 'Collective not found' }, { status: 404 })
+  const goal = goalId ? collective.goals.find((g) => g.id === goalId) : null
+  if (goalId && !goal) return NextResponse.json({ error: 'That goal does not exist.' }, { status: 400 })
 
   try {
     const order = await createOrder({
       amountCents,
       currency: collective.currency,
-      customId: contributionCustomId(collective.id, viewer.id),
-      description: `Contribution to ${collective.name}`,
+      customId: contributionCustomId(collective.id, viewer.id, goal?.id),
+      description: goal ? `${goal.title}: ${collective.name}` : `Contribution to ${collective.name}`,
     })
     return NextResponse.json({ orderId: order.id })
   } catch (e) {
