@@ -3,6 +3,7 @@ import { computeTreasury } from './treasury'
 import { formatMoney } from './money'
 import { createPayoutBatch, getPayoutBatch, PayPalError, type PayoutItem } from './paypal'
 import { recordEvent } from './audit'
+import { receiverLabel } from './recipients'
 
 // Approved spending → PayPal Payouts. The only code path that moves money out.
 // Recipient and ledger state change only from PayPal's own answers: the batch
@@ -60,7 +61,7 @@ export async function executePayout(proposalId: string): Promise<{ ok: boolean; 
         status: 'PENDING',
         source: 'PAYPAL_API',
         memo: p.title,
-        counterparty: `${r.name} · ${r.receiver}`,
+        counterparty: `${r.name} · ${receiverLabel(r.receiver)}`,
         proposalId: p.id,
         payoutRecipientId: r.id,
       },

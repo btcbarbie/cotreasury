@@ -13,6 +13,7 @@ import { drawPanel, revealPanel, REVIEW_WINDOW_HOURS } from '@/lib/panel'
 import { closeRejected, votersLeft } from '@/lib/voting'
 import { recordEvent } from '@/lib/audit'
 import { admitMember } from '@/lib/members'
+import { normalizeReceiver, type ReceiverType } from '@/lib/recipients'
 import { formatMoney } from '@/lib/money'
 
 // Demo-mode identity switch: lets a judge act as different members (e.g. three
@@ -40,9 +41,14 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
   const viewer = await getViewer(collectiveId)
   if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
 
-  const recipients = (draft.recipients ?? [])
-    .filter((r) => r.name && r.receiver && Number.isInteger(r.amountCents) && r.amountCents > 0)
-    .map((r) => ({ name: String(r.name).slice(0, 80), receiver: String(r.receiver).trim().slice(0, 120), amountCents: r.amountCents }))
+  const recipients: { name: string; receiver: string; receiverType: ReceiverType; amountCents: number }[] = []
+  for (const r of draft.recipients ?? []) {
+    if (!r.name || !r.receiver || !Number.isInteger(r.amountCents) || r.amountCents <= 0) continue
+    const receiverType: ReceiverType = r.receiverType === 'PHONE' ? 'PHONE' : 'EMAIL'
+    const checked = normalizeReceiver(receiverType, String(r.receiver).slice(0, 120))
+    if (!checked.ok) return { ok: false, error: `${String(r.name).slice(0, 80)}: ${checked.error}` }
+    recipients.push({ name: String(r.name).slice(0, 80), receiver: checked.receiver, receiverType, amountCents: r.amountCents })
+  }
   if (recipients.length === 0) return { ok: false, error: 'Add at least one recipient.' }
 
   const a = await assessSpend(collectiveId, recipients, viewer.id)
@@ -64,7 +70,7 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
       proposedById: viewer.id,
       aiAssessment: JSON.stringify({ draftedByAI: true }),
       flags: JSON.stringify(a.flags),
-      recipients: { create: recipients.map((r) => ({ ...r, receiverType: 'EMAIL' })) },
+      recipients: { create: recipients },
     },
   })
     const panel = collective.approvalMode !== 'FIXED'

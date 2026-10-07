@@ -4,6 +4,7 @@ import { computeTreasury, tierFor, canApprove } from './treasury'
 import { formatMoney } from './money'
 import { assessSpend, type Flag } from './governance'
 import { goalProgress } from './goals'
+import type { ReceiverType } from './recipients'
 
 // The AI Treasurer. It can READ the ledger and run deterministic checks, and it
 // can DRAFT a spending request. It cannot approve, submit, change rules or move
@@ -17,7 +18,7 @@ const client = new Anthropic({ baseURL: process.env.COTREASURY_ANTHROPIC_URL || 
 export type DraftRequest = {
   title: string
   description: string
-  recipients: { name: string; receiver: string; amountCents: number }[]
+  recipients: { name: string; receiver: string; receiverType?: ReceiverType; amountCents: number }[]
   amountCents: number
   requiredApprovals: number
   flags: Flag[]

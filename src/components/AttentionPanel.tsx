@@ -3,6 +3,9 @@
 import { AlertTriangle, CheckCircle2, Clock, Hourglass, Scale, Send, UserCheck } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import type { GoalProgress } from '@/lib/goals'
+import { receiverLabel } from '@/lib/recipients'
+
+const isPhone = (receiver: string) => /^\d{10}$/.test(receiver)
 
 type Proposal = {
   id: string
@@ -63,7 +66,7 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
           tone: 'text-red bg-red-soft',
           Icon: AlertTriangle,
           title: `${m(r.amountCents)} to ${r.name} came back`,
-          detail: `PayPal returned the payout to ${r.receiver}. Check the email and raise a new request.`,
+          detail: `PayPal returned the payout to ${receiverLabel(r.receiver)}. Check the ${isPhone(r.receiver) ? 'number' : 'email'} and raise a new request.`,
         })
       }
       if (r.status === 'UNCLAIMED') {
@@ -73,7 +76,7 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
           tone: 'text-amber bg-amber-soft',
           Icon: Clock,
           title: `${r.name} hasn't claimed ${m(r.amountCents)}`,
-          detail: `PayPal sent it to ${r.receiver}. Ask them to log in or sign up with that email to claim it; unclaimed money returns after 30 days.`,
+          detail: `PayPal sent it to ${receiverLabel(r.receiver)}. Ask them to log in or sign up with that ${isPhone(r.receiver) ? 'phone number' : 'email'} to claim it; unclaimed money returns after 30 days.`,
         })
       }
     }

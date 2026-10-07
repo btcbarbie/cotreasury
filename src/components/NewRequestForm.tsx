@@ -4,15 +4,16 @@ import { useState, useTransition } from 'react'
 import { Loader2, Plus, Send, Trash2, X } from 'lucide-react'
 import { submitRequest } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
+import { normalizeReceiver, RECEIVER_TYPES, type ReceiverType } from '@/lib/recipients'
 
-type Row = { name: string; receiver: string; amount: string }
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+type Row = { name: string; type: ReceiverType; receiver: string; amount: string }
+const EMPTY: Row = { name: '', type: 'EMAIL', receiver: '', amount: '' }
 
 /** Manual spending request: same server-side checks as an AI-drafted one. */
 export function NewRequestForm({ collectiveId, currency, onClose }: { collectiveId: string; currency: string; onClose: () => void }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [rows, setRows] = useState<Row[]>([{ name: '', receiver: '', amount: '' }])
+  const [rows, setRows] = useState<Row[]>([EMPTY])
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
@@ -26,17 +27,15 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
     for (const [i, r] of rows.entries()) {
       const who = r.name.trim() || `Recipient ${i + 1}`
       if (!r.name.trim()) return setError(`Recipient ${i + 1} needs a name.`)
-      if (!EMAIL.test(r.receiver.trim())) {
-        const hint = /@[^.\s]+$/.test(r.receiver.trim()) ? ` It looks incomplete. Did you mean ${r.receiver.trim()}.com?` : ''
-        return setError(`“${r.receiver.trim() || '(empty)'}” isn’t a full email address for ${who}.${hint}`)
-      }
+      const checked = normalizeReceiver(r.type, r.receiver)
+      if (!checked.ok) return setError(`${who}: ${checked.error}`)
       if (!(cents(r.amount) > 0)) return setError(`Enter an amount for ${who}.`)
     }
     start(async () => {
       const res = await submitRequest(collectiveId, {
         title,
         description,
-        recipients: rows.map((r) => ({ name: r.name.trim(), receiver: r.receiver.trim(), amountCents: cents(r.amount) })),
+        recipients: rows.map((r) => ({ name: r.name.trim(), receiver: r.receiver.trim(), receiverType: r.type, amountCents: cents(r.amount) })),
         amountCents: total,
         requiredApprovals: 0, // recomputed on the server from the rules
         flags: [],
@@ -77,7 +76,27 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
             >
               <Trash2 size={15} />
             </button>
-            <input className="input" placeholder="Recipient's email" inputMode="email" value={r.receiver} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, receiver: e.target.value } : x)))} />
+            <div className="flex">
+              <select
+                className="input !w-auto shrink-0 rounded-r-none border-r-0 !pr-7 text-sm"
+                aria-label="Send by"
+                value={r.type}
+                onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, type: e.target.value as ReceiverType, receiver: '' } : x)))}
+              >
+                {RECEIVER_TYPES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input min-w-0 rounded-l-none"
+                placeholder={RECEIVER_TYPES.find((t) => t.id === r.type)?.placeholder}
+                inputMode={r.type === 'PHONE' ? 'tel' : 'email'}
+                value={r.receiver}
+                onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, receiver: e.target.value } : x)))}
+              />
+            </div>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
               <input
@@ -91,13 +110,13 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
           </div>
         ))}
       </div>
-      <button type="button" className="mt-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink" onClick={() => setRows([...rows, { name: '', receiver: '', amount: '' }])}>
+      <button type="button" className="mt-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink" onClick={() => setRows([...rows, EMPTY])}>
         <Plus size={14} /> Add recipient
       </button>
 
       <p className="mt-4 rounded-lg bg-bg px-3 py-2 text-xs leading-relaxed text-muted">
-        Recipients don&apos;t need a PayPal account. PayPal emails them; if they don&apos;t have an account they create one for free to claim the
-        money, then move it to their bank or card. <span className="font-medium text-ink">Sandbox tip:</span> paying a sandbox personal account
+        Recipients don&apos;t need a PayPal account. PayPal emails or texts them; if they don&apos;t have an account they create one for free to
+        claim the money, then move it to their bank or card. <span className="font-medium text-ink">Sandbox tip:</span> paying a sandbox personal account
         email shows Paid straight away; any other email shows “Sent · awaiting claim”.
       </p>
 

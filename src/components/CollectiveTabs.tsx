@@ -15,6 +15,7 @@ import { AttentionPanel, attentionItems } from './AttentionPanel'
 import { ActivityPanel, type ActivityEvent } from './ActivityPanel'
 import type { GoalProgress } from '@/lib/goals'
 import type { LedgerRow } from './LedgerGrid'
+import { receiverLabel } from '@/lib/recipients'
 
 // AG Grid touches window on import; render it client-side only.
 const LedgerGrid = dynamic(() => import('./LedgerGrid').then((m) => m.LedgerGrid), {
@@ -372,7 +373,7 @@ function RequestCard({
             return (
               <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <span className="min-w-0 truncate">
-                  {r.name} <span className="text-muted">· {r.receiver}</span>
+                  {r.name} <span className="text-muted">· {receiverLabel(r.receiver)}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   {rs && (

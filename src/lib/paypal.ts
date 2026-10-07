@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { paypalRecipient } from './recipients'
 
 // Thin server-side PayPal REST client. Credentials never reach the browser
 // except the public client id used by the JS SDK.
@@ -197,8 +198,7 @@ export function createPayoutBatch(opts: {
         email_message: opts.message.slice(0, 1000),
       },
       items: opts.items.map((i) => ({
-        recipient_type: i.recipientType,
-        receiver: i.receiver,
+        ...paypalRecipient(i.recipientType, i.receiver),
         amount: { value: (i.amountCents / 100).toFixed(2), currency: opts.currency },
         sender_item_id: i.senderItemId,
         note: i.note.slice(0, 4000),

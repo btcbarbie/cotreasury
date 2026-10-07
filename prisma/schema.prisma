@@ -142,7 +142,7 @@ model PayoutRecipient {
   proposalId   String
   name         String
   receiver     String  // email / phone / Venmo handle
-  receiverType String  @default("EMAIL") // "EMAIL" | "PHONE" | "VENMO_HANDLE"
+  receiverType String  @default("EMAIL") // "EMAIL" | "PHONE" (see lib/recipients.ts)
   amountCents  Int
   // PENDING → SENT (in a batch) → SUCCEEDED | UNCLAIMED | FAILED | RETURNED
   status       String  @default("PENDING")
