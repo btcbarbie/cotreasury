@@ -102,7 +102,7 @@ export default function Home() {
 
       {/* Pillars */}
       <section id="how-it-works" className="scroll-mt-20 border-t border-line py-14 sm:py-16">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your money. Your rules. Your collective.</h2>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your treasury. Your rules. Your collective.</h2>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PILLARS.map((p) => (
             <div key={p.title} className="card p-5">
