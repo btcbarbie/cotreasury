@@ -148,6 +148,7 @@ export function CollectiveTabs(props: {
         {tab === 'Activity log' && (
           <div className="grid gap-10">
             <TreasurerPanel
+              key={props.viewerId}
               variant="assistant"
               collectiveId={props.collectiveId}
               kind={props.kind}

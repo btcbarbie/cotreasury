@@ -175,7 +175,8 @@ async function CollectiveContent({
       )}
 
 
-      <TreasurerPanel collectiveId={collective.id} kind={collective.kind} currency={cur} brief={brief} />
+      {/* Keyed by viewer: each member's chat is private and starts fresh when you switch. */}
+      <TreasurerPanel key={viewer.id} collectiveId={collective.id} kind={collective.kind} currency={cur} brief={brief} />
 
       <CollectiveTabs
         collectiveId={collective.id}

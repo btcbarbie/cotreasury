@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { AlertTriangle, ArrowUp, Check, FileText, HandCoins, Loader2, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowUp, Check, FileText, HandCoins, Loader2, Lock, Sparkles, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { submitRequest } from '@/app/c/[id]/actions'
 import { MinimizeButton } from './Collapsible'
@@ -200,6 +200,9 @@ export function TreasurerPanel({
             <ArrowUp size={16} />
           </button>
         </form>
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+          <Lock size={11} /> Private to you and not saved. Other members only see what you submit or pay.
+        </p>
       </div>
         </>
       )}
