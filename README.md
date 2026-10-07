@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TrustPool
 
-## Getting Started
+**A collectively governed treasury for groups that pool money.**
 
-First, run the development server:
+PayPal already helps groups *collect* money. TrustPool helps them *spend* it together:
+an AI Treasurer coordinates, members approve by the group's own rules, PayPal moves the money,
+and a shared ledger shows everyone where every dollar went.
+
+> AI proposes. Humans govern. PayPal executes. Webhooks verify. The ledger records.
+
+Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
+
+## Status
+
+Work in progress. Implemented so far:
+
+- Collectives with members, approvers and configurable approval tiers
+- Shared ledger (AG Grid) with running balance and verification source per entry
+- Deterministic treasury math (available, committed, awaiting approval)
+- Demo mode: switch between members to try the approval flow
+
+Coming next: PayPal sandbox contributions and payouts, webhook verification, the AI Treasurer,
+and the unapproved-movement monitor.
+
+## Run locally
 
 ```bash
+npm install
+npx prisma db push
+npm run seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## License
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

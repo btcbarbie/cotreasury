@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// All money is stored as integer cents. The AI never writes to these tables
+// directly; only governance-checked server code and verified PayPal events do.
+
+model Collective {
+  id          String   @id @default(cuid())
+  name        String
+  purpose     String
+  kind        String   // "BOOSTER_CLUB" | "SCHOLARSHIP_FUND" | "COMMUNITY" | "OTHER"
+  currency    String   @default("USD")
+  // How this collective's own PayPal Business account is connected.
+  // "SANDBOX_DEMO" = the shared TrustPool sandbox account used for the demo.
+  paypalMode  String   @default("SANDBOX_DEMO")
+  paypalEmail String?  // the collective's PayPal Business account (display only)
+  createdAt   DateTime @default(now())
+
+  members     Member[]
+  tiers       GovernanceTier[]
+  entries     LedgerEntry[]
+  proposals   Proposal[]
+}
+
+model Member {
+  id           String   @id @default(cuid())
+  collectiveId String
+  name         String
+  email        String
+  role         String   @default("MEMBER") // "MEMBER" | "APPROVER" | "ADMIN"
+  createdAt    DateTime @default(now())
+
+  collective   Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
+  entries      LedgerEntry[]
+  approvals    Approval[]
+  proposals    Proposal[] @relation("ProposedBy")
+
+  @@unique([collectiveId, email])
+}
+
+// Spend thresholds: an amount in [minCents, maxCents) needs `requiredApprovals`
+// approvals from members with the APPROVER or ADMIN role. maxCents null = no cap.
+model GovernanceTier {
+  id                String  @id @default(cuid())
+  collectiveId      String
+  minCents          Int
+  maxCents          Int?
+  requiredApprovals Int
+
+  collective        Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
+}
+
+model LedgerEntry {
+  id           String    @id @default(cuid())
+  collectiveId String
+  type         String    // "CONTRIBUTION" | "PAYOUT" | "REFUND" | "OPENING_BALANCE" | "UNAPPROVED_MOVEMENT"
+  direction    String    // "IN" | "OUT"
+  amountCents  Int
+  status       String    @default("PENDING") // "PENDING" | "CONFIRMED" | "FAILED"
+  // Where the status came from: "PAYPAL_WEBHOOK" | "PAYPAL_API" | "IMPORTED"
+  source       String
+  memo         String?
+  counterparty String?   // payer or recipient display name / email
+  memberId     String?
+  proposalId   String?
+  paypalRef    String?   // capture id / payout item id / transaction id
+  createdAt    DateTime  @default(now())
+  confirmedAt  DateTime?
+
+  collective   Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
+  member       Member?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  proposal     Proposal?  @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+
+  @@index([collectiveId, createdAt])
+}
+
+model Proposal {
+  id                String   @id @default(cuid())
+  collectiveId      String
+  title             String
+  description       String?
+  amountCents       Int
+  // Snapshot of the tier at proposal time, so later rule edits can't change
+  // what an in-flight proposal needs.
+  requiredApprovals Int
+  status            String   @default("PENDING_APPROVAL") // "PENDING_APPROVAL" | "APPROVED" | "EXECUTING" | "COMPLETED" | "REJECTED" | "FAILED"
+  proposedById      String?
+  aiAssessment      String?  // JSON from the AI Treasurer (advisory only)
+  paypalBatchId     String?
+  createdAt         DateTime @default(now())
+
+  collective        Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
+  proposedBy        Member?    @relation("ProposedBy", fields: [proposedById], references: [id], onDelete: SetNull)
+  recipients        PayoutRecipient[]
+  approvals         Approval[]
+  entries           LedgerEntry[]
+}
+
+model PayoutRecipient {
+  id           String  @id @default(cuid())
+  proposalId   String
+  name         String
+  receiver     String  // email / phone / Venmo handle
+  receiverType String  @default("EMAIL") // "EMAIL" | "PHONE" | "VENMO_HANDLE"
+  amountCents  Int
+  status       String  @default("PENDING")
+  paypalItemId String?
+
+  proposal     Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+}
+
+model Approval {
+  id         String   @id @default(cuid())
+  proposalId String
+  memberId   String
+  decision   String   // "APPROVE" | "REJECT"
+  createdAt  DateTime @default(now())
+
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, memberId])
+}
+
+// Every PayPal webhook we receive, stored once by PayPal's event id so retries
+// are idempotent.
+model WebhookEvent {
+  id          String    @id // PayPal event id
+  eventType   String
+  verified    Boolean
+  payload     String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+}
