@@ -108,7 +108,7 @@ export function createOrder(opts: { amountCents: number; currency: string; custo
           amount: { currency_code: opts.currency, value: (opts.amountCents / 100).toFixed(2) },
           custom_id: opts.customId,
           description: opts.description.slice(0, 127),
-          soft_descriptor: 'TRUSTPOOL',
+          soft_descriptor: 'COTREASURY',
         },
       ],
       payment_source: {
@@ -116,7 +116,7 @@ export function createOrder(opts: { amountCents: number; currency: string; custo
           experience_context: {
             shipping_preference: 'NO_SHIPPING',
             user_action: 'PAY_NOW',
-            brand_name: 'TrustPool',
+            brand_name: 'CoTreasury',
           },
         },
       },

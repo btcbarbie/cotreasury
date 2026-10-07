@@ -24,7 +24,7 @@ const STATUS_FROM_CAPTURE: Record<string, 'PENDING' | 'CONFIRMED' | 'FAILED'> = 
 /** Record a capture the buyer just approved. Always PENDING until PayPal confirms. */
 export async function recordCaptureAttempt(capture: PayPalCapture, fallbackCustomId: string) {
   const ids = parseCustomId(capture.custom_id ?? fallbackCustomId)
-  if (!ids) throw new Error('Capture is missing TrustPool custom_id')
+  if (!ids) throw new Error('Capture is missing CoTreasury custom_id')
   const existing = await prisma.ledgerEntry.findFirst({ where: { paypalRef: capture.id } })
   if (existing) return existing // webhook may have beaten us here
 

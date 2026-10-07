@@ -14,7 +14,7 @@ export default function CollectivePage({ params }: PageProps<'/c/[id]'>) {
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
       <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-        <ChevronLeft size={15} /> All collectives
+        <ChevronLeft size={15} /> All treasuries
       </Link>
       <Suspense fallback={<div className="mt-6 h-64 card animate-pulse" />}>
         <CollectiveContent params={params} />

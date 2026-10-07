@@ -14,7 +14,7 @@ export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id
     const unit = order.purchase_units[0]
     const capture = unit?.payments?.captures?.[0]
     if (!capture) return NextResponse.json({ error: 'PayPal returned no capture.' }, { status: 502 })
-    // Only accept orders TrustPool created for this collective.
+    // Only accept orders CoTreasury created for this collective.
     const customId = capture.custom_id ?? unit.custom_id ?? ''
     if (!customId.startsWith(`${id}:`)) return NextResponse.json({ error: 'Order does not belong to this collective.' }, { status: 400 })
 

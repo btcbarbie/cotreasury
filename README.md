@@ -1,12 +1,14 @@
-# TrustPool
+# CoTreasury
 
-**A collectively governed treasury for groups that pool money.**
+**A treasury governed by the collective it serves.**
 
-PayPal already helps groups *collect* money. TrustPool helps them *spend* it together:
-an AI Treasurer coordinates, members approve by the group's own rules, PayPal moves the money,
-and a shared ledger shows everyone where every dollar went.
+*Shared purpose. Shared treasury. Collective control.*
 
-> AI proposes. Humans govern. PayPal executes. Webhooks verify. The ledger records.
+When people share a purpose, managing the money shouldn't depend on one person. CoTreasury gives groups a
+shared financial layer to coordinate contributions, understand their treasury, govern spending, and act
+together, with AI as the financial coordinator and people in control.
+
+> AI coordinates. People govern. PayPal moves. The ledger remembers.
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 

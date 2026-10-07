@@ -11,7 +11,7 @@ import { assessSpend, type Flag } from './governance'
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5'
 // Pin the endpoint so a shell-level ANTHROPIC_BASE_URL (e.g. from dev tooling) can't redirect calls.
-const client = new Anthropic({ baseURL: process.env.TRUSTPOOL_ANTHROPIC_URL || 'https://api.anthropic.com' })
+const client = new Anthropic({ baseURL: process.env.COTREASURY_ANTHROPIC_URL || 'https://api.anthropic.com' })
 
 export type DraftRequest = {
   title: string

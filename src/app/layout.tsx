@@ -7,9 +7,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TrustPool — spend together, safely",
+  title: "CoTreasury — a treasury governed by the collective it serves",
   description:
-    "A collectively governed treasury. An AI Treasurer coordinates, members approve, PayPal moves the money, and a shared ledger keeps everyone honest.",
+    "Shared purpose. Shared treasury. Collective control. AI coordinates, people govern, PayPal moves the money, and the ledger remembers.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -20,9 +20,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-accent to-teal text-[11px] font-bold text-white">
-                TP
+                CT
               </span>
-              TrustPool
+              CoTreasury
             </Link>
             <span className="pill pill-gray">PayPal sandbox</span>
           </div>
