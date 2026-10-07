@@ -77,7 +77,7 @@ export default function Home() {
           Money works better when everyone can see it.
         </p>
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
-          CoTreasury gives groups one shared place to collect money, make decisions, and keep track of every payment.
+          CoTreasury gives groups one shared place to raise funds, make collective financial decisions, and keep track of every payment.
         </p>
         <p className="mt-5 text-sm font-medium tracking-tight sm:text-base">
           AI helps manage the treasury. Your group sets the rules. PayPal handles approved payments.
