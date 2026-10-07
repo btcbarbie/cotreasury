@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { BellRing, ChevronLeft, Clock, Landmark, Lock, Wallet } from 'lucide-react'
+import { BellRing, ChevronLeft, PartyPopper, Clock, Landmark, Lock, Wallet } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
@@ -10,21 +10,28 @@ import { ContributeButton } from '@/components/ContributeDialog'
 import { TreasurerPanel } from '@/components/TreasurerPanel'
 import { canApprove } from '@/lib/treasury'
 
-export default function CollectivePage({ params }: PageProps<'/c/[id]'>) {
+export default function CollectivePage({ params, searchParams }: PageProps<'/c/[id]'>) {
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
       <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
         <ChevronLeft size={15} /> All treasuries
       </Link>
       <Suspense fallback={<div className="mt-6 h-64 card animate-pulse" />}>
-        <CollectiveContent params={params} />
+        <CollectiveContent params={params} searchParams={searchParams} />
       </Suspense>
     </div>
   )
 }
 
-async function CollectiveContent({ params }: { params: Promise<{ id: string }> }) {
+async function CollectiveContent({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const { id } = await params
+  const justCreated = (await searchParams).created === '1'
   const view = await getCollectiveView(id)
   if (!view) notFound()
   const { collective, viewer, treasury } = view
@@ -100,6 +107,18 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
           </div>
         ))}
       </div>
+
+      {justCreated && (
+        <div className="mt-6 flex items-start gap-3 rounded-[14px] border border-accent/25 bg-accent-soft px-4 py-3 text-sm text-accent">
+          <PartyPopper size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <div className="font-medium">Your treasury is open.</div>
+            <div className="text-accent/80">
+              Make the first contribution, ask the AI Treasurer what it can do, or switch members (top right) to see what each person sees.
+            </div>
+          </div>
+        </div>
+      )}
 
       {needsMe > 0 && (
         <a

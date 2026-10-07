@@ -38,6 +38,7 @@ async function createCollective(
       purpose: data.purpose,
       kind: data.kind,
       paypalEmail: data.paypalEmail,
+      isDemo: true,
       tiers: { create: data.tiers },
       members: {
         create: data.members.map((m, i) => ({

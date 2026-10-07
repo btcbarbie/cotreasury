@@ -6,8 +6,17 @@ export function viewerCookieName(collectiveId: string) {
   return `tp_viewer_${collectiveId}`
 }
 
-export async function listCollectives() {
+export const MY_TREASURIES_COOKIE = 'ct_mine'
+
+/** Treasury ids this browser created (demo-mode ownership; not authentication). */
+export async function myTreasuryIds(): Promise<string[]> {
+  const jar = await cookies()
+  return (jar.get(MY_TREASURIES_COOKIE)?.value ?? '').split(',').filter(Boolean)
+}
+
+export async function listCollectives(filter: { demo: true } | { ids: string[] }) {
   const collectives = await prisma.collective.findMany({
+    where: 'demo' in filter ? { isDemo: true } : { id: { in: filter.ids }, isDemo: false },
     orderBy: { createdAt: 'asc' },
     include: {
       entries: { select: { direction: true, status: true, amountCents: true } },

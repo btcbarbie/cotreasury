@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { connection } from 'next/server'
-import { ArrowRight, ArrowUpRight, BookOpen, GraduationCap, Scale, Send, Sparkles, Trophy, Users } from 'lucide-react'
-import { listCollectives } from '@/lib/collectives'
+import { ArrowRight, ArrowUpRight, BookOpen, GraduationCap, HandHeart, Plus, Scale, Send, Sparkles, Trophy, Users } from 'lucide-react'
+import { listCollectives, myTreasuryIds } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 
 const KIND_META: Record<string, { label: string; Icon: typeof Users; tone: string; bar: string }> = {
   SCHOLARSHIP_FUND: { label: 'Scholarship fund', Icon: GraduationCap, tone: 'bg-violet-soft text-violet', bar: 'from-violet to-teal' },
   BOOSTER_CLUB: { label: 'Booster club', Icon: Trophy, tone: 'bg-amber-soft text-amber', bar: 'from-amber to-red' },
+  COMMUNITY_FUND: { label: 'Community fund', Icon: HandHeart, tone: 'bg-accent-soft text-accent', bar: 'from-accent to-teal' },
+  OTHER: { label: 'Treasury', Icon: Users, tone: 'bg-blue-soft text-blue', bar: 'from-blue to-violet' },
 }
 
 const PILLARS = [
@@ -68,14 +70,18 @@ export default function Home() {
           AI coordinates. People govern. PayPal moves. The ledger remembers.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <a href="#treasuries" className="btn btn-primary !h-11 !px-5">
+          <Link href="/new" className="btn btn-primary !h-11 !px-5">
             Create a Treasury <ArrowRight size={16} />
-          </a>
+          </Link>
           <a href="#how-it-works" className="btn btn-ghost !h-11 !px-5">
             See How It Works
           </a>
         </div>
       </section>
+
+      <Suspense fallback={null}>
+        <MyTreasuries />
+      </Suspense>
 
       {/* Pillars */}
       <section className="border-t border-line py-14 sm:py-16">
@@ -126,7 +132,7 @@ export default function Home() {
         </div>
         <div className="mt-8">
           <Suspense fallback={<CollectiveGridSkeleton />}>
-            <CollectiveGrid />
+            <DemoGrid />
           </Suspense>
         </div>
       </section>
@@ -134,9 +140,32 @@ export default function Home() {
   )
 }
 
-async function CollectiveGrid() {
+async function MyTreasuries() {
+  const ids = await myTreasuryIds()
+  if (ids.length === 0) return null
+  const collectives = await listCollectives({ ids })
+  if (collectives.length === 0) return null
+  return (
+    <section className="border-t border-line py-14 sm:py-16">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your treasuries</h2>
+        <Link href="/new" className="btn btn-ghost !h-9">
+          <Plus size={15} /> New treasury
+        </Link>
+      </div>
+      <div className="mt-8">
+        <TreasuryGrid collectives={collectives} />
+      </div>
+    </section>
+  )
+}
+
+async function DemoGrid() {
   await connection() // live balances: never prerender this list at build time
-  const collectives = await listCollectives()
+  return <TreasuryGrid collectives={await listCollectives({ demo: true })} />
+}
+
+function TreasuryGrid({ collectives }: { collectives: Awaited<ReturnType<typeof listCollectives>> }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {collectives.map((c) => {

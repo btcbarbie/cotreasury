@@ -13,7 +13,7 @@ model Collective {
   id          String   @id @default(cuid())
   name        String
   purpose     String
-  kind        String   // "BOOSTER_CLUB" | "SCHOLARSHIP_FUND" | "COMMUNITY" | "OTHER"
+  kind        String   // "SCHOLARSHIP_FUND" | "BOOSTER_CLUB" | "COMMUNITY_FUND" | "OTHER"
   currency    String   @default("USD")
   // How this collective's own PayPal Business account is connected.
   // "SANDBOX_DEMO" = the shared TrustPool sandbox account used for the demo.
@@ -22,6 +22,9 @@ model Collective {
   // Bank-style "new payee" control: the first payment to a recipient this
   // collective has never paid needs one extra approval.
   newPayeeRule Boolean @default(true)
+  // Seeded showcase treasuries are listed for every visitor; user-created ones
+  // only for the browser that created them.
+  isDemo      Boolean  @default(false)
   createdAt   DateTime @default(now())
 
   members     Member[]
