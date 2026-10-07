@@ -48,7 +48,7 @@ export class PayPalError extends Error {
 
 async function paypal<T>(
   path: string,
-  init: { method?: string; body?: unknown; rawJson?: string; requestId?: string } = {},
+  init: { method?: string; body?: unknown; rawJson?: string; requestId?: string; prefer?: string } = {},
   attempt = 0,
 ): Promise<T> {
   const method = init.method ?? 'GET'
@@ -58,6 +58,7 @@ async function paypal<T>(
   }
   // Idempotency: retries with the same request id never double-charge or double-pay.
   if (method === 'POST') headers['PayPal-Request-Id'] = init.requestId ?? randomUUID()
+  if (init.prefer) headers['Prefer'] = init.prefer
 
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -232,4 +233,29 @@ export type CaptureDetail = PayPalCapture & {
 
 export function getCaptureDetail(captureId: string) {
   return paypal<CaptureDetail>(`/v2/payments/captures/${captureId}`)
+}
+
+// ---------- Which PayPal account actually holds the money ----------
+
+let merchant: Promise<{ email: string | null; merchantId: string | null }> | null = null
+
+/**
+ * The sandbox business account these API credentials belong to: where
+ * contributions land and payouts leave from. PayPal reports it as the payee on
+ * any order, so we create one (never captured; it simply expires) and remember
+ * the answer for the life of the server.
+ */
+export function getMerchantAccount() {
+  merchant ??= paypal<{ purchase_units: { payee?: { email_address?: string; merchant_id?: string } }[] }>('/v2/checkout/orders', {
+    method: 'POST',
+    requestId: 'cotreasury-merchant-lookup',
+    prefer: 'return=representation',
+    body: { intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' }, description: 'Account lookup (never captured)' }] },
+  })
+    .then((o) => ({ email: o.purchase_units[0]?.payee?.email_address ?? null, merchantId: o.purchase_units[0]?.payee?.merchant_id ?? null }))
+    .catch(() => {
+      merchant = null // try again next time
+      return { email: null, merchantId: null }
+    })
+  return merchant
 }

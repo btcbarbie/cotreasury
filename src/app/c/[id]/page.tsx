@@ -13,6 +13,7 @@ import { RequestPaymentButton } from '@/components/RequestPaymentButton'
 import { TreasurerPanel } from '@/components/TreasurerPanel'
 import { canApprove } from '@/lib/treasury'
 import { goalProgress } from '@/lib/goals'
+import { getMerchantAccount } from '@/lib/paypal'
 
 export default function CollectivePage({ params, searchParams }: PageProps<'/c/[id]'>) {
   return (
@@ -34,7 +35,7 @@ async function CollectiveContent({
   await connection() // live treasury data and today's date: always render per request
   const { id } = await params
   const justCreated = (await searchParams).created === '1'
-  const view = await getCollectiveView(id)
+  const [view, account] = await Promise.all([getCollectiveView(id), getMerchantAccount()])
   if (!view) notFound()
   const { collective, viewer, treasury } = view
   const cur = collective.currency
@@ -88,9 +89,13 @@ async function CollectiveContent({
           <p className="mt-1.5 max-w-2xl text-muted">{collective.purpose}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <span className="pill pill-green">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> PayPal connected
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> PayPal sandbox account
             </span>
-            <span className="text-muted truncate">{collective.paypalEmail}</span>
+            {/* The account that really holds the money, as reported by PayPal, not a label we typed in. */}
+            <span className="truncate font-mono text-xs text-ink/80" title={account.merchantId ? `PayPal merchant ID ${account.merchantId}` : undefined}>
+              {account.email ?? 'PayPal sandbox business account'}
+            </span>
+            <span className="text-xs text-muted">· shared by all demo treasuries; in real use each group connects its own</span>
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:items-end">

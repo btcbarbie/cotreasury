@@ -307,7 +307,7 @@ export function CreateTreasuryWizard() {
               In the collective&apos;s own PayPal account. CoTreasury coordinates and records; it never holds the money.
             </p>
             <label className="mt-5 block">
-              <span className="label">PayPal Business account email</span>
+              <span className="label">Your group&apos;s PayPal Business email (used when you go live)</span>
               <input className="input mt-1.5" inputMode="email" placeholder={creator.email || 'treasury@yourgroup.org'} value={paypalEmail} onChange={(e) => setPaypalEmail(e.target.value)} />
             </label>
             <div className="mt-5 grid gap-2 text-sm">
