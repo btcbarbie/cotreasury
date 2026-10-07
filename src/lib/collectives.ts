@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import { computeTreasury } from './treasury'
 import { refreshPanels } from './panel'
+import { closeStaleRequests } from './voting'
 
 export function viewerCookieName(collectiveId: string) {
   return `tp_viewer_${collectiveId}`
@@ -41,8 +42,10 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
 }
 
 export async function getCollectiveView(id: string) {
-  // Lazily replace panel reviewers whose 48-hour window passed without a vote.
+  // Lazily replace panel reviewers whose 48-hour window passed without a vote,
+  // and close requests that couldn't pass once the remaining voters had theirs.
   await refreshPanels(id)
+  await closeStaleRequests(id)
   const collective = await prisma.collective.findUnique({
     where: { id },
     include: {

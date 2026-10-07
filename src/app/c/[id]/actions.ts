@@ -8,7 +8,8 @@ import { canApprove } from '@/lib/treasury'
 import { assessSpend, describeRuleChange, ruleChangeApprovals, validateRules, type RulesPayload } from '@/lib/governance'
 import type { DraftRequest } from '@/lib/treasurer'
 import { executePayout, retryPayout } from '@/lib/payouts'
-import { drawPanel, revealPanel } from '@/lib/panel'
+import { drawPanel, revealPanel, REVIEW_WINDOW_HOURS } from '@/lib/panel'
+import { closeRejected, votersLeft } from '@/lib/voting'
 import { recordEvent } from '@/lib/audit'
 import { formatMoney } from '@/lib/money'
 
@@ -131,7 +132,9 @@ export async function proposeRuleChange(collectiveId: string, rules: RulesPayloa
 
 /**
  * Maker-checker: only approvers can decide, never on their own request, and
- * once each. One rejection stops the request.
+ * once each. A "no" doesn't end the vote: the request is approved once it has
+ * enough approvals, and only fails when it can no longer get them. Everyone
+ * eligible still gets to vote before it closes (see lib/voting.ts).
  */
 export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'REJECT'): Promise<Result> {
   const proposal = await prisma.proposal.findUnique({ where: { id: proposalId }, include: { approvals: true } })
@@ -154,7 +157,9 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
     await tx.approval.create({ data: { proposalId, memberId: viewer.id, decision } })
     if (seat) await tx.proposalReviewer.update({ where: { id: seat.id }, data: { status: 'VOTED' } })
     const approvals = await tx.approval.count({ where: { proposalId, decision: 'APPROVE' } })
-    const status = decision === 'REJECT' ? 'REJECTED' : approvals >= proposal.requiredApprovals ? 'APPROVED' : 'PENDING_APPROVAL'
+    const left = await votersLeft(tx, proposal)
+    const wontPass = approvals + left < proposal.requiredApprovals
+    const status = approvals >= proposal.requiredApprovals ? 'APPROVED' : wontPass && left === 0 ? 'REJECTED' : 'PENDING_APPROVAL'
     await recordEvent(
       proposal.collectiveId,
       {
@@ -165,19 +170,32 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
       },
       tx,
     )
-    if (status === 'APPROVED' || status === 'REJECTED') {
+    if (wontPass && !proposal.wontPassAt && status === 'PENDING_APPROVAL') {
+      // Settled: no money will move. Remaining voters still get their say.
+      await tx.proposal.update({ where: { id: proposalId }, data: { wontPassAt: new Date() } })
+      await recordEvent(
+        proposal.collectiveId,
+        {
+          actor: 'CoTreasury',
+          action: 'REQUEST_WONT_PASS',
+          summary: `"${proposal.title}" can no longer reach ${proposal.requiredApprovals} approval${proposal.requiredApprovals === 1 ? '' : 's'}, so no money will move. Voting stays open until everyone has voted or ${REVIEW_WINDOW_HOURS}h pass`,
+          data: { proposalId },
+        },
+        tx,
+      )
+    }
+    if (status === 'REJECTED') return closeRejected(tx, proposalId, 'ALL_VOTED')
+    if (status === 'APPROVED') {
       await revealPanel(tx, proposalId)
       await recordEvent(
         proposal.collectiveId,
         {
           actor: 'CoTreasury',
-          action: status === 'APPROVED' ? (proposal.kind === 'RULE_CHANGE' ? 'RULES_CHANGED' : 'REQUEST_APPROVED') : 'REQUEST_REJECTED',
+          action: proposal.kind === 'RULE_CHANGE' ? 'RULES_CHANGED' : 'REQUEST_APPROVED',
           summary:
-            status === 'REJECTED'
-              ? `"${proposal.title}" was rejected`
-              : proposal.kind === 'RULE_CHANGE'
-                ? `new spending rules took effect: ${proposal.description?.replace(/\n/g, '; ')}`
-                : `"${proposal.title}" reached ${proposal.requiredApprovals} approval${proposal.requiredApprovals === 1 ? '' : 's'}`,
+            proposal.kind === 'RULE_CHANGE'
+              ? `new spending rules took effect: ${proposal.description?.replace(/\n/g, '; ')}`
+              : `"${proposal.title}" reached ${proposal.requiredApprovals} approval${proposal.requiredApprovals === 1 ? '' : 's'}`,
           data: { proposalId },
         },
         tx,

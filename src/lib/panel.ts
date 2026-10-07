@@ -79,7 +79,7 @@ export async function drawPanel(
 export async function refreshPanels(collectiveId: string) {
   const now = new Date()
   const stale = await prisma.proposalReviewer.findMany({
-    where: { status: 'ACTIVE', expiresAt: { lt: now }, proposal: { collectiveId, status: 'PENDING_APPROVAL', panelSeed: { not: null } } },
+    where: { status: 'ACTIVE', expiresAt: { lt: now }, proposal: { collectiveId, status: 'PENDING_APPROVAL', panelSeed: { not: null }, wontPassAt: null } },
     include: { proposal: { include: { reviewers: true, collective: { include: { members: true } } } } },
   })
   for (const r of stale) {

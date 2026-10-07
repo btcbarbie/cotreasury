@@ -4,7 +4,7 @@
 
 type Entry = { direction: string; status: string; amountCents: number }
 type Tier = { minCents: number; maxCents: number | null; requiredApprovals: number }
-type ProposalLike = { status: string; amountCents: number }
+type ProposalLike = { status: string; amountCents: number; wontPassAt?: Date | null }
 
 export type TreasuryState = {
   confirmedBalanceCents: number
@@ -31,8 +31,9 @@ export function computeTreasury(entries: Entry[], proposals: ProposalLike[]): Tr
   const committed = proposals
     .filter((p) => p.status === 'APPROVED')
     .reduce((s, p) => s + p.amountCents, 0)
+  // A request that can no longer pass is still being voted on, but won't spend anything.
   const awaiting = proposals
-    .filter((p) => p.status === 'PENDING_APPROVAL')
+    .filter((p) => p.status === 'PENDING_APPROVAL' && !p.wontPassAt)
     .reduce((s, p) => s + p.amountCents, 0)
 
   return {

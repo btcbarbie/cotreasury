@@ -22,10 +22,15 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
   function submit() {
     setError(null)
     if (title.trim().length < 3) return setError('Give the request a short title.')
-    for (const r of rows) {
-      if (!r.name.trim() || !EMAIL.test(r.receiver.trim()) || !(cents(r.amount) > 0)) {
-        return setError('Each recipient needs a name, a PayPal email and an amount.')
+    // Say exactly which field is wrong, e.g. an email missing its ".com".
+    for (const [i, r] of rows.entries()) {
+      const who = r.name.trim() || `Recipient ${i + 1}`
+      if (!r.name.trim()) return setError(`Recipient ${i + 1} needs a name.`)
+      if (!EMAIL.test(r.receiver.trim())) {
+        const hint = /@[^.\s]+$/.test(r.receiver.trim()) ? ` It looks incomplete. Did you mean ${r.receiver.trim()}.com?` : ''
+        return setError(`“${r.receiver.trim() || '(empty)'}” isn’t a full email address for ${who}.${hint}`)
       }
+      if (!(cents(r.amount) > 0)) return setError(`Enter an amount for ${who}.`)
     }
     start(async () => {
       const res = await submitRequest(collectiveId, {
@@ -72,7 +77,7 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
             >
               <Trash2 size={15} />
             </button>
-            <input className="input" placeholder="PayPal email" inputMode="email" value={r.receiver} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, receiver: e.target.value } : x)))} />
+            <input className="input" placeholder="Recipient's email" inputMode="email" value={r.receiver} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, receiver: e.target.value } : x)))} />
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
               <input
@@ -90,8 +95,10 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
         <Plus size={14} /> Add recipient
       </button>
 
-      <p className="mt-4 rounded-lg bg-bg px-3 py-2 text-xs text-muted">
-        Sandbox tip: pay a PayPal <span className="font-medium text-ink">sandbox personal account</span> email to see it marked Paid. Any other email shows “Sent · awaiting claim”.
+      <p className="mt-4 rounded-lg bg-bg px-3 py-2 text-xs leading-relaxed text-muted">
+        Recipients don&apos;t need a PayPal account. PayPal emails them; if they don&apos;t have an account they create one for free to claim the
+        money, then move it to their bank or card. <span className="font-medium text-ink">Sandbox tip:</span> paying a sandbox personal account
+        email shows Paid straight away; any other email shows “Sent · awaiting claim”.
       </p>
 
       {error && <div className="mt-3 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}

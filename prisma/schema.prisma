@@ -118,6 +118,10 @@ model Proposal {
   // hash is sealed in the activity log when the panel is drawn.
   panelSeed         String?
   panelCommitment   String?
+  // Set when the request can no longer reach its approvals. No money moves,
+  // but voting stays open so everyone eligible is heard; it closes as
+  // REJECTED once they have all voted or the review window passes.
+  wontPassAt        DateTime?
   createdAt         DateTime @default(now())
 
   collective        Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)

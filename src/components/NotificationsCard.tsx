@@ -15,6 +15,7 @@ const LOOK: Record<string, { Icon: typeof Bell; tone: string }> = {
   PAYOUT_RETURNED: { Icon: AlertTriangle, tone: 'bg-red-soft text-red' },
   REQUEST_CREATED: { Icon: FileText, tone: 'bg-amber-soft text-amber' },
   REQUEST_APPROVED: { Icon: Check, tone: 'bg-accent-soft text-accent' },
+  REQUEST_WONT_PASS: { Icon: X, tone: 'bg-red-soft text-red' },
   REQUEST_REJECTED: { Icon: X, tone: 'bg-red-soft text-red' },
   RULE_CHANGE_PROPOSED: { Icon: Scale, tone: 'bg-violet-soft text-violet' },
   RULES_CHANGED: { Icon: Scale, tone: 'bg-violet-soft text-violet' },

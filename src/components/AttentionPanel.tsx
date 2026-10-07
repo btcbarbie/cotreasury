@@ -11,6 +11,7 @@ type Proposal = {
   amountCents: number
   requiredApprovals: number
   status: string
+  wontPass: boolean
   proposedById: string | null
   approvals: { memberId: string; decision: string }[]
   recipients: { name: string; receiver: string; amountCents: number; status: string }[]
@@ -35,10 +36,12 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
       items.push({
         key: `p-${x.id}`,
         group: 'Needs approval',
-        tone: mine ? 'text-amber bg-amber-soft' : 'text-muted bg-bg',
+        tone: x.wontPass ? 'text-red bg-red-soft' : mine ? 'text-amber bg-amber-soft' : 'text-muted bg-bg',
         Icon: x.kind === 'RULE_CHANGE' ? Scale : mine ? UserCheck : Hourglass,
         title: label,
-        detail: mine
+        detail: x.wontPass
+          ? `Can no longer reach ${x.requiredApprovals} approval${x.requiredApprovals === 1 ? '' : 's'}, so no money will move.${mine ? ' Your vote still counts for the record.' : ' Waiting for the remaining votes before it closes.'}`
+          : mine
           ? x.panel
             ? `You were drawn for the review panel. ${yes} of ${x.requiredApprovals} approvals so far.`
             : `Your sign-off is needed. ${yes} of ${x.requiredApprovals} approvals so far.`

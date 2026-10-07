@@ -13,7 +13,9 @@ export type PendingApproval = {
   amountCents: number
   requestedBy: string | null
   approvals: number
+  rejections: number
   required: number
+  wontPass: boolean
   recipients: { name: string; receiver: string; amountCents: number }[]
   flags: string[]
   panel: boolean
@@ -38,10 +40,11 @@ export function ApprovalsPill({ items, currency }: { items: PendingApproval[]; c
 
   if (items.length === 0) return null
   const payouts = items.filter((i) => i.kind !== 'RULE_CHANGE').length
+  const ask = items.some((i) => i.wontPass) ? 'your vote' : 'your approval'
   const label =
     payouts === items.length
-      ? `${items.length} payout${items.length === 1 ? ' needs' : 's need'} your approval`
-      : `${items.length} request${items.length === 1 ? ' needs' : 's need'} your approval`
+      ? `${items.length} payout${items.length === 1 ? ' needs' : 's need'} ${ask}`
+      : `${items.length} request${items.length === 1 ? ' needs' : 's need'} ${ask}`
 
   return (
     <div ref={ref} className="relative w-fit">
@@ -73,14 +76,14 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const isRule = p.kind === 'RULE_CHANGE'
-  const deciding = p.approvals + 1 >= p.required
+  const deciding = !p.wontPass && p.approvals + 1 >= p.required
 
   function decide(decision: 'APPROVE' | 'REJECT') {
     setError(null)
     start(async () => {
       const r = await decideRequest(p.id, decision)
       if (!r.ok) return setError(r.error)
-      setDone(decision === 'REJECT' ? 'Rejected' : deciding && !isRule ? 'Approved. The group’s PayPal account is sending it.' : 'Approved')
+      setDone(decision === 'REJECT' ? 'You voted no. Your vote is on the record.' : p.wontPass ? 'You voted yes. Your vote is on the record.' : deciding && !isRule ? 'Approved. The group’s PayPal account is sending it.' : 'Approved')
     })
   }
 
@@ -125,6 +128,7 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
           ))}
         </span>
         {p.approvals} of {p.required} approvals
+        {p.rejections > 0 && <span className="text-red">· {p.rejections} rejected</span>}
       </div>
 
       {done ? (
@@ -133,6 +137,11 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
         </div>
       ) : (
         <>
+          {p.wontPass && (
+            <p className="mt-4 rounded-lg bg-red-soft/60 px-3 py-2 text-xs leading-relaxed text-red">
+              This can no longer get enough approvals, so no money will move. You can still vote so the group&apos;s decision is on the record.
+            </p>
+          )}
           {deciding && !isRule && (
             <p className="mt-4 rounded-lg bg-bg px-3 py-2 text-xs leading-relaxed text-muted">
               Yours is the final approval. The group&apos;s PayPal account sends {formatMoney(p.amountCents, currency)} to the recipients; nothing comes from your own account.

@@ -33,6 +33,7 @@ type Proposal = {
   amountCents: number
   requiredApprovals: number
   status: string
+  wontPass: boolean
   createdAt: string
   proposedBy: string | null
   proposedById: string | null
@@ -264,8 +265,14 @@ function RequestCard({
   }
 
   const approvals = p.approvals.filter((a) => a.decision === 'APPROVE').length
+  const rejections = p.approvals.length - approvals
   const isRule = p.kind === 'RULE_CHANGE'
-  const s = isRule && p.status === 'COMPLETED' ? { label: 'Applied', pill: 'pill-green' } : (PROPOSAL_STATUS[p.status] ?? { label: p.status, pill: 'pill-gray' })
+  const s =
+    isRule && p.status === 'COMPLETED'
+      ? { label: 'Applied', pill: 'pill-green' }
+      : p.wontPass && p.status === 'PENDING_APPROVAL'
+        ? { label: 'Won’t pass · voting open', pill: 'pill-red' }
+        : (PROPOSAL_STATUS[p.status] ?? { label: p.status, pill: 'pill-gray' })
   const isApprover = viewerRole === 'APPROVER' || viewerRole === 'ADMIN'
   const isMaker = p.proposedById === viewerId
   const voted = p.approvals.some((a) => a.memberId === viewerId)
@@ -282,7 +289,11 @@ function RequestCard({
   // Panel requests: only drawn reviewers vote. Fixed: any approver except the maker, once.
   const canVote = p.panel ? p.panel.canVote : open && isApprover && !isMaker && !voted
   let note: string | null = null
-  if (p.panel && open) {
+  if (p.wontPass && open) {
+    note = canVote
+      ? 'This can no longer get enough approvals, so no money will move. You can still vote so the group’s decision is on the record.'
+      : 'This can no longer get enough approvals, so no money will move. It closes as rejected once everyone has voted or the review window ends.'
+  } else if (p.panel && open) {
     note = p.panel.canVote
       ? 'You were drawn at random to review this. Nobody else can see who is on the panel until it is decided.'
       : isMaker
@@ -312,7 +323,7 @@ function RequestCard({
           </div>
           {!expanded && (
             <div className="mt-1 text-xs text-muted">
-              {approvals} of {p.requiredApprovals} approvals · requested by {p.proposedBy ?? 'unknown'}
+              {approvals} of {p.requiredApprovals} approvals{rejections > 0 ? ` · ${rejections} rejected` : ''} · requested by {p.proposedBy ?? 'unknown'}
               {canVote && <span className="ml-1 font-medium text-amber">· your vote is needed</span>}
             </div>
           )}
@@ -420,6 +431,7 @@ function RequestCard({
           )}
           <span className="text-sm text-muted">
             <span className="tabular font-medium text-ink">{approvals}</span> of {p.requiredApprovals} approvals
+            {rejections > 0 && <span className="text-red"> · {rejections} rejected</span>}
           </span>
         </div>
         {canVote && (
@@ -429,7 +441,7 @@ function RequestCard({
             </button>
             <button className="btn btn-primary !h-8 !bg-accent" onClick={() => decide('APPROVE')} disabled={pending}>
               {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}{' '}
-              {!isRule && approvals + 1 >= p.requiredApprovals ? 'Approve & release payout' : 'Approve'}
+              {!isRule && !p.wontPass && approvals + 1 >= p.requiredApprovals ? 'Approve & release payout' : 'Approve'}
             </button>
           </div>
         )}
