@@ -120,7 +120,7 @@ async function loadState(collectiveId: string) {
   const c = await prisma.collective.findUniqueOrThrow({
     where: { id: collectiveId },
     include: {
-      members: true,
+      members: { where: { role: { not: 'FORMER' } } },
       goals: true,
       tiers: { orderBy: { minCents: 'asc' } },
       entries: { orderBy: { createdAt: 'desc' } },

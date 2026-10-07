@@ -55,9 +55,16 @@ async function CollectiveContent({
   ]
 
   // Approver inbox: open requests this viewer is allowed to vote on and hasn't yet.
-  const pendingForMe = canApprove(viewer.role)
+  // Can this viewer vote on p right now? Panel requests: only an active panel seat. Otherwise: approvers.
+  const mySeat = (p: (typeof collective.proposals)[number]) => p.reviewers.some((r) => r.memberId === viewer.id && r.status === 'ACTIVE')
+  const canVote = (p: (typeof collective.proposals)[number]) =>
+    p.status === 'PENDING_APPROVAL' &&
+    p.proposedById !== viewer.id &&
+    !p.approvals.some((a) => a.memberId === viewer.id) &&
+    (p.panelSeed ? mySeat(p) : canApprove(viewer.role))
+  const pendingForMe = collective.proposals.some(canVote)
     ? collective.proposals
-        .filter((p) => p.status === 'PENDING_APPROVAL' && p.proposedById !== viewer.id && !p.approvals.some((a) => a.memberId === viewer.id))
+        .filter(canVote)
         .map((p) => ({
           id: p.id,
           kind: p.kind,
@@ -69,6 +76,7 @@ async function CollectiveContent({
           required: p.requiredApprovals,
           recipients: p.recipients.map((r) => ({ name: r.name, receiver: r.receiver, amountCents: r.amountCents })),
           flags: p.flags ? (JSON.parse(p.flags) as { message: string }[]).map((f) => f.message) : [],
+          panel: !!p.panelSeed,
         }))
     : []
 
@@ -169,6 +177,9 @@ async function CollectiveContent({
 
       <CollectiveTabs
         collectiveId={collective.id}
+        collectiveName={collective.name}
+        purpose={collective.purpose}
+        approvalMode={collective.approvalMode}
         kind={collective.kind}
         viewerName={viewer.name}
         currency={cur}
@@ -208,10 +219,16 @@ async function CollectiveContent({
           createdAt: p.createdAt.toISOString(),
           proposedBy: p.proposedBy?.name ?? null,
           proposedById: p.proposedById,
-          approvals: p.approvals.map((a) => ({ memberId: a.memberId, memberName: a.member.name, decision: a.decision })),
+          // While a hidden panel is still voting, nobody sees who is on it or who voted.
+          approvals: p.approvals.map((a) =>
+            p.panelSeed && p.status === 'PENDING_APPROVAL'
+              ? { memberId: a.memberId === viewer.id ? a.memberId : `hidden-${a.id}`, memberName: 'Panel reviewer', decision: a.decision }
+              : { memberId: a.memberId, memberName: a.member.name, decision: a.decision },
+          ),
           recipients: p.recipients.map((r) => ({ id: r.id, name: r.name, receiver: r.receiver, amountCents: r.amountCents, status: r.status, paypalItemId: r.paypalItemId })),
           paypalBatchId: p.paypalBatchId,
           failureReason: p.failureReason,
+          panel: p.panelSeed ? { size: p.reviewers.filter((r) => r.status !== 'REPLACED').length, iAmReviewer: mySeat(p), canVote: canVote(p) } : null,
         }))}
       />
     </>

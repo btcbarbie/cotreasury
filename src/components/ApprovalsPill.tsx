@@ -16,6 +16,7 @@ export type PendingApproval = {
   required: number
   recipients: { name: string; receiver: string; amountCents: number }[]
   flags: string[]
+  panel: boolean
 }
 
 /** "N payouts need your approval": approvers can vote right from the dashboard. */
@@ -97,6 +98,7 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
         p.description && <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink/80">{p.description}</p>
       ) : (
         <div className="mt-3">
+          {p.panel && <div className="mb-1.5 text-xs font-medium text-violet">You were drawn at random to review this</div>}
           <div className="text-xs text-muted">{p.requestedBy ?? 'Someone'} wants to pay, from the group&apos;s account:</div>
           <ul className="mt-1.5 grid gap-1 text-sm">
             {p.recipients.map((r) => (

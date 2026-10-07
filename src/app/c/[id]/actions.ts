@@ -8,6 +8,7 @@ import { canApprove } from '@/lib/treasury'
 import { assessSpend, describeRuleChange, ruleChangeApprovals, validateRules, type RulesPayload } from '@/lib/governance'
 import type { DraftRequest } from '@/lib/treasurer'
 import { executePayout, retryPayout } from '@/lib/payouts'
+import { drawPanel, revealPanel } from '@/lib/panel'
 import { recordEvent } from '@/lib/audit'
 import { formatMoney } from '@/lib/money'
 
@@ -44,7 +45,12 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
   const a = await assessSpend(collectiveId, recipients, viewer.id)
   if (!a.affordable) return { ok: false, error: 'This would exceed the money available to spend.' }
 
-  const created = await prisma.proposal.create({
+  const collective = await prisma.collective.findUniqueOrThrow({
+    where: { id: collectiveId },
+    select: { approvalMode: true, members: { where: { role: { not: 'FORMER' } }, select: { id: true, role: true } } },
+  })
+  await prisma.$transaction(async (tx) => {
+    const p = await tx.proposal.create({
     data: {
       collectiveId,
       kind: 'SPEND',
@@ -58,11 +64,20 @@ export async function submitRequest(collectiveId: string, draft: DraftRequest): 
       recipients: { create: recipients.map((r) => ({ ...r, receiverType: 'EMAIL' })) },
     },
   })
-  await recordEvent(collectiveId, {
-    actor: viewer.name,
-    action: 'REQUEST_CREATED',
-    summary: `requested ${formatMoney(a.amountCents, a.currency)} for "${created.title}" (needs ${a.requiredApprovals} approval${a.requiredApprovals === 1 ? '' : 's'})`,
-    data: { proposalId: created.id, amountCents: a.amountCents, recipients: recipients.map((r) => r.receiver), flags: a.flags.map((f) => f.code) },
+    const panel = collective.approvalMode !== 'FIXED'
+    await recordEvent(
+      collectiveId,
+      {
+        actor: viewer.name,
+        action: 'REQUEST_CREATED',
+        summary: `requested ${formatMoney(a.amountCents, a.currency)} for "${p.title}" (needs ${a.requiredApprovals} approval${a.requiredApprovals === 1 ? '' : 's'}${panel ? ' from a hidden review panel' : ''})`,
+        data: { proposalId: p.id, amountCents: a.amountCents, recipients: recipients.map((r) => r.receiver), flags: a.flags.map((f) => f.code) },
+      },
+      tx,
+    )
+    // Random / mixed review: draw the hidden panel with the request.
+    if (panel) await drawPanel(tx, p, collective.members, collective.approvalMode)
+    return p
   })
   refresh()
   return { ok: true }
@@ -85,7 +100,10 @@ export async function proposeRuleChange(collectiveId: string, rules: RulesPayloa
     tiers: c.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals })),
     approverIds: c.members.filter((m) => canApprove(m.role)).map((m) => m.id),
     newPayeeRule: c.newPayeeRule,
+    approvalMode: c.approvalMode as RulesPayload['approvalMode'],
   }
+  if ((rules.removeMemberIds ?? []).includes(viewer.id)) return { ok: false, error: 'You can’t propose removing yourself.' }
+  if (admin && (rules.removeMemberIds ?? []).includes(admin.id)) return { ok: false, error: 'The admin can’t be removed.' }
   const lines = describeRuleChange(current, rules, new Map(c.members.map((m) => [m.id, m.name])), c.currency)
   if (lines.length === 0) return { ok: false, error: 'Nothing changed.' }
 
@@ -121,18 +139,26 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
   if (proposal.status !== 'PENDING_APPROVAL') return { ok: false, error: 'This request is no longer open for approval.' }
 
   const viewer = await getViewer(proposal.collectiveId)
-  if (!viewer || !canApprove(viewer.role)) return { ok: false, error: 'Only approvers can decide on requests.' }
-  if (proposal.proposedById === viewer.id) return { ok: false, error: 'You created this request, so another approver must review it.' }
+  if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
+  if (proposal.proposedById === viewer.id) return { ok: false, error: 'You created this request, so someone else must review it.' }
+  // Panel requests: only the members drawn for the panel can vote. Otherwise: approvers.
+  const seat = proposal.panelSeed
+    ? await prisma.proposalReviewer.findFirst({ where: { proposalId, memberId: viewer.id, status: 'ACTIVE' } })
+    : null
+  if (proposal.panelSeed ? !seat : !canApprove(viewer.role)) {
+    return { ok: false, error: proposal.panelSeed ? 'Only the members drawn for this review panel can decide.' : 'Only approvers can decide on requests.' }
+  }
   if (proposal.approvals.some((a) => a.memberId === viewer.id)) return { ok: false, error: 'You have already voted on this request.' }
 
   await prisma.$transaction(async (tx) => {
     await tx.approval.create({ data: { proposalId, memberId: viewer.id, decision } })
+    if (seat) await tx.proposalReviewer.update({ where: { id: seat.id }, data: { status: 'VOTED' } })
     const approvals = await tx.approval.count({ where: { proposalId, decision: 'APPROVE' } })
     const status = decision === 'REJECT' ? 'REJECTED' : approvals >= proposal.requiredApprovals ? 'APPROVED' : 'PENDING_APPROVAL'
     await recordEvent(
       proposal.collectiveId,
       {
-        actor: viewer.name,
+        actor: proposal.panelSeed ? 'A panel reviewer' : viewer.name,
         action: decision === 'APPROVE' ? 'VOTE_APPROVE' : 'VOTE_REJECT',
         summary: `${decision === 'APPROVE' ? 'approved' : 'rejected'} "${proposal.title}" (${approvals} of ${proposal.requiredApprovals})`,
         data: { proposalId, decision },
@@ -140,6 +166,7 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
       tx,
     )
     if (status === 'APPROVED' || status === 'REJECTED') {
+      await revealPanel(tx, proposalId)
       await recordEvent(
         proposal.collectiveId,
         {
@@ -164,7 +191,14 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
       await tx.governanceTier.createMany({ data: rules.tiers.map((t) => ({ ...t, collectiveId: proposal.collectiveId })) })
       await tx.member.updateMany({ where: { collectiveId: proposal.collectiveId, role: 'APPROVER', id: { notIn: rules.approverIds } }, data: { role: 'MEMBER' } })
       await tx.member.updateMany({ where: { collectiveId: proposal.collectiveId, role: 'MEMBER', id: { in: rules.approverIds } }, data: { role: 'APPROVER' } })
-      await tx.collective.update({ where: { id: proposal.collectiveId }, data: { newPayeeRule: rules.newPayeeRule } })
+      await tx.collective.update({
+        where: { id: proposal.collectiveId },
+        data: { newPayeeRule: rules.newPayeeRule, ...(rules.approvalMode ? { approvalMode: rules.approvalMode } : {}) },
+      })
+      if (rules.removeMemberIds?.length) {
+        // Former members keep their history (payments, votes) but can no longer act.
+        await tx.member.updateMany({ where: { collectiveId: proposal.collectiveId, id: { in: rules.removeMemberIds }, role: { not: 'ADMIN' } }, data: { role: 'FORMER' } })
+      }
       await tx.proposal.update({ where: { id: proposalId }, data: { status: 'COMPLETED' } })
       return
     }
@@ -239,4 +273,43 @@ export async function markNotificationsSeen(collectiveId: string, seq: number) {
   const viewer = await getViewer(collectiveId)
   if (!viewer || !Number.isInteger(seq) || seq <= viewer.lastSeenSeq) return
   await prisma.member.update({ where: { id: viewer.id }, data: { lastSeenSeq: seq } })
+}
+
+/** Admin: rename the treasury or reword its purpose. Logged, not governed (moves no money). */
+export async function updateTreasuryDetails(collectiveId: string, input: { name: string; purpose: string }): Promise<Result> {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer || viewer.role !== 'ADMIN') return { ok: false, error: 'Only the admin can edit the treasury details.' }
+  const name = input.name?.trim() ?? ''
+  const purpose = input.purpose?.trim() ?? ''
+  if (name.length < 3 || name.length > 80) return { ok: false, error: 'Give the treasury a name (3–80 characters).' }
+  if (purpose.length < 10 || purpose.length > 400) return { ok: false, error: 'Describe the shared purpose in a sentence or two.' }
+  const before = await prisma.collective.findUniqueOrThrow({ where: { id: collectiveId }, select: { name: true, purpose: true } })
+  if (before.name === name && before.purpose === purpose) return { ok: true }
+  await prisma.collective.update({ where: { id: collectiveId }, data: { name, purpose } })
+  await recordEvent(collectiveId, {
+    actor: viewer.name,
+    action: 'TREASURY_EDITED',
+    summary: before.name !== name ? `renamed the treasury from "${before.name}" to "${name}"` : 'updated the shared purpose',
+    data: { before, after: { name, purpose } },
+  })
+  refresh()
+  return { ok: true }
+}
+
+/** Admin: add a member (contributor). Making someone an approver is a governed rule change. */
+export async function addMember(collectiveId: string, input: { name: string; email: string }): Promise<Result> {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer || viewer.role !== 'ADMIN') return { ok: false, error: 'Only the admin can add members.' }
+  const name = input.name?.trim() ?? ''
+  const email = input.email?.trim().toLowerCase() ?? ''
+  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'Add a name and a valid email.' }
+  const existing = await prisma.member.findUnique({ where: { collectiveId_email: { collectiveId, email } } })
+  if (existing && existing.role !== 'FORMER') return { ok: false, error: 'Someone with that email is already a member.' }
+  // New members start with nothing unread: they only hear about what happens after they join.
+  const head = await prisma.auditEvent.findFirst({ where: { collectiveId }, orderBy: { seq: 'desc' }, select: { seq: true } })
+  if (existing) await prisma.member.update({ where: { id: existing.id }, data: { name, role: 'MEMBER', lastSeenSeq: head?.seq ?? 0 } })
+  else await prisma.member.create({ data: { collectiveId, name, email, role: 'MEMBER', lastSeenSeq: head?.seq ?? 0 } })
+  await recordEvent(collectiveId, { actor: viewer.name, action: 'MEMBER_ADDED', summary: `added ${name} to the group`, data: { email } })
+  refresh()
+  return { ok: true }
 }

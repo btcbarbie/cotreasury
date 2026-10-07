@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { AlertTriangle, Check, Loader2, RotateCcw, Scale, Send, X } from 'lucide-react'
+import { AlertTriangle, Check, Loader2, RotateCcw, Scale, Send, UsersRound, X } from 'lucide-react'
 import { decideRequest, refreshCollective, retryRequestPayout } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
+import { AddMemberButton, TreasuryDetailsCard } from './SettingsPanels'
 import { OverviewPanel } from './OverviewPanel'
 import { TreasurerPanel } from './TreasurerPanel'
 import { AttentionPanel, attentionItems } from './AttentionPanel'
@@ -38,13 +39,17 @@ type Proposal = {
   recipients: { id: string; name: string; receiver: string; amountCents: number; status: string; paypalItemId: string | null }[]
   paypalBatchId: string | null
   failureReason: string | null
+  panel: { size: number; iAmReviewer: boolean; canVote: boolean } | null
 }
 
-const TABS = ['Overview', 'Activity log', 'Ledger', 'People & rules'] as const
+const TABS = ['Overview', 'Activity log', 'Ledger', 'Settings'] as const
 type Tab = (typeof TABS)[number]
 
 export function CollectiveTabs(props: {
   collectiveId: string
+  collectiveName: string
+  purpose: string
+  approvalMode: string
   kind: string
   viewerName: string
   currency: string
@@ -86,7 +91,7 @@ export function CollectiveTabs(props: {
     Overview: attention.length || undefined,
     'Activity log': props.proposals.filter((p) => p.status === 'PENDING_APPROVAL').length || undefined,
     Ledger: props.entries.length,
-    'People & rules': props.members.length,
+    Settings: props.members.length,
   }
 
   return (
@@ -159,22 +164,36 @@ export function CollectiveTabs(props: {
             <LedgerGrid entries={props.entries} currency={props.currency} />
           </div>
         )}
-        {tab === 'People & rules' && (
+        {tab === 'Settings' && (
           <div className="grid gap-10">
-            <RulesPanel
+            <TreasuryDetailsCard
+              key={`${props.collectiveName}|${props.purpose}`}
               collectiveId={props.collectiveId}
-              tiers={props.tiers}
-              members={props.members}
-              currency={props.currency}
-              newPayeeRule={props.newPayeeRule}
-              viewerRole={props.viewerRole}
-              ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
+              name={props.collectiveName}
+              purpose={props.purpose}
+              isAdmin={props.viewerRole === 'ADMIN'}
             />
             <section>
-              <h3 className="mb-3 font-semibold tracking-tight">
-                Members<span className="tabular ml-2 text-sm font-normal text-muted">{props.members.length}</span>
-              </h3>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="font-semibold tracking-tight">
+                  Members<span className="tabular ml-2 text-sm font-normal text-muted">{props.members.length}</span>
+                </h3>
+                {props.viewerRole === 'ADMIN' && <AddMemberButton collectiveId={props.collectiveId} />}
+              </div>
               <MembersPanel members={props.members} />
+            </section>
+            <section>
+              <h3 className="mb-3 font-semibold tracking-tight">Rules &amp; governance</h3>
+              <RulesPanel
+                collectiveId={props.collectiveId}
+                tiers={props.tiers}
+                members={props.members}
+                currency={props.currency}
+                newPayeeRule={props.newPayeeRule}
+                approvalMode={props.approvalMode}
+                viewerRole={props.viewerRole}
+                ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
+              />
             </section>
           </div>
         )}
@@ -287,8 +306,18 @@ function RequestCard({
     })
   }
 
+  // Panel requests: only drawn reviewers vote. Fixed: any approver except the maker, once.
+  const canVote = p.panel ? p.panel.canVote : open && isApprover && !isMaker && !voted
   let note: string | null = null
-  if (open && !isApprover) note = 'Only approvers can sign off on requests.'
+  if (p.panel && open) {
+    note = p.panel.canVote
+      ? 'You were drawn at random to review this. Nobody else can see who is on the panel until it is decided.'
+      : isMaker
+        ? 'A hidden review panel was drawn at random. You will see who reviewed it once it is decided.'
+        : voted
+          ? 'Your vote is in. Waiting for the rest of the panel.'
+          : 'Reviewed by a hidden panel drawn at random; their names are revealed once it is decided.'
+  } else if (open && !isApprover) note = 'Only approvers can sign off on requests.'
   else if (open && isMaker) note = 'You created this request, so another approver has to review it.'
   else if (open && voted) note = 'You have signed off. Waiting for the other approvers.'
 
@@ -378,6 +407,11 @@ function RequestCard({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          {p.panel ? (
+            <span className="pill pill-violet">
+              <UsersRound size={12} /> {open ? 'Hidden review panel' : 'Review panel'} of {p.panel.size}
+            </span>
+          ) : (
           <div className="flex -space-x-1.5">
             {approvers.map((m) => {
               const vote = p.approvals.find((a) => a.memberId === m.id)
@@ -393,11 +427,12 @@ function RequestCard({
               )
             })}
           </div>
+          )}
           <span className="text-sm text-muted">
             <span className="tabular font-medium text-ink">{approvals}</span> of {p.requiredApprovals} approvals
           </span>
         </div>
-        {open && isApprover && !isMaker && !voted && (
+        {canVote && (
           <div className="flex gap-2">
             <button className="btn btn-ghost !h-8" onClick={() => decide('REJECT')} disabled={pending}>
               Reject

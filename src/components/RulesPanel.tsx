@@ -9,6 +9,12 @@ import { Avatar, RoleBadge } from './ui'
 type Member = { id: string; name: string; email: string; role: string }
 type Tier = { minCents: number; maxCents: number | null; requiredApprovals: number }
 
+export const MODES = [
+  { id: 'FIXED', label: 'Fixed approvers', hint: 'The approvers below vote on every payout.' },
+  { id: 'RANDOM', label: 'Random review panel', hint: 'Each payout gets reviewers drawn at random from all members, hidden from the requester until decided.' },
+  { id: 'MIXED', label: 'Mixed panel', hint: 'One seat drawn from the approvers, the rest from all members, hidden until decided.' },
+]
+
 const CONTROLS = [
   { title: 'Maker ≠ checker', body: 'Whoever submits a request can never approve it.' },
   { title: 'Amount thresholds', body: 'Bigger spends need more approvers, set by the rules on the left.' },
@@ -22,6 +28,7 @@ export function RulesPanel({
   members,
   currency,
   newPayeeRule,
+  approvalMode,
   viewerRole,
   ruleChangePending,
 }: {
@@ -30,6 +37,7 @@ export function RulesPanel({
   members: Member[]
   currency: string
   newPayeeRule: boolean
+  approvalMode: string
   viewerRole: string
   ruleChangePending: boolean
 }) {
@@ -38,7 +46,9 @@ export function RulesPanel({
   const [editing, setEditing] = useState(false)
 
   if (editing) {
-    return <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} newPayeeRule={newPayeeRule} onClose={() => setEditing(false)} />
+    return (
+      <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} newPayeeRule={newPayeeRule} approvalMode={approvalMode} onClose={() => setEditing(false)} />
+    )
   }
 
   return (
@@ -78,6 +88,13 @@ export function RulesPanel({
               </span>
             </div>
           ))}
+          <div className="flex items-start justify-between gap-4 py-3 text-sm">
+            <span>
+              Who reviews payouts
+              <span className="block text-xs text-muted">{MODES.find((m) => m.id === approvalMode)?.hint}</span>
+            </span>
+            <span className="pill pill-violet shrink-0">{MODES.find((m) => m.id === approvalMode)?.label}</span>
+          </div>
           <div className="flex items-center justify-between py-3 text-sm">
             <span>First payment to a new recipient</span>
             <span className={`pill ${newPayeeRule ? 'pill-amber' : 'pill-gray'}`}>{newPayeeRule ? '+1 approval' : 'Off'}</span>
@@ -126,14 +143,18 @@ function RulesEditor({
   tiers,
   members,
   newPayeeRule,
+  approvalMode,
   onClose,
 }: {
   collectiveId: string
   tiers: Tier[]
   members: Member[]
   newPayeeRule: boolean
+  approvalMode: string
   onClose: () => void
 }) {
+  const [mode, setMode] = useState(approvalMode)
+  const [removeIds, setRemoveIds] = useState<string[]>([])
   // Edit tiers as "upper bounds" so ranges always stay contiguous.
   const [rows, setRows] = useState(tiers.map((t) => ({ upTo: t.maxCents === null ? '' : String(t.maxCents / 100), approvals: t.requiredApprovals })))
   const [approverIds, setApproverIds] = useState(members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN').map((m) => m.id))
@@ -155,7 +176,13 @@ function RulesEditor({
   function submit() {
     setError(null)
     start(async () => {
-      const res = await proposeRuleChange(collectiveId, { tiers: build(), approverIds, newPayeeRule: payeeRule })
+      const res = await proposeRuleChange(collectiveId, {
+        tiers: build(),
+        approverIds,
+        newPayeeRule: payeeRule,
+        approvalMode: mode as 'FIXED' | 'RANDOM' | 'MIXED',
+        removeMemberIds: removeIds,
+      })
       if (!res.ok) return setError(res.error)
       onClose()
     })
@@ -239,6 +266,46 @@ function RulesEditor({
             </label>
           )
         })}
+      </div>
+
+      <div className="mt-6 label">Who reviews payouts</div>
+      <div className="mt-2 grid gap-2">
+        {MODES.map((m) => (
+          <label key={m.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${mode === m.id ? 'border-ink bg-bg' : 'border-line'}`}>
+            <input type="radio" name="mode" checked={mode === m.id} onChange={() => setMode(m.id)} className="mt-0.5 accent-[var(--accent)]" />
+            <span>
+              <span className="font-medium">{m.label}</span>
+              <span className="block text-muted">{m.hint}</span>
+            </span>
+          </label>
+        ))}
+        {mode !== 'FIXED' && members.length < 8 && (
+          <p className="text-xs text-amber">With {members.length} members it&apos;s easy to guess who was drawn. Random panels work best from about 8 members.</p>
+        )}
+        {mode !== 'FIXED' && <p className="text-xs text-muted">Changes to these rules are still approved by the named approvers.</p>}
+      </div>
+
+      <div className="mt-6 label">Remove from the group</div>
+      <p className="mt-1 text-xs text-muted">Former members keep their history in the ledger but can no longer act. Approvers must be unticked above first.</p>
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+        {members
+          .filter((m) => m.role !== 'ADMIN')
+          .map((m) => {
+            const marked = removeIds.includes(m.id)
+            const blocked = approverIds.includes(m.id)
+            return (
+              <label key={m.id} className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm ${blocked ? 'opacity-50' : 'cursor-pointer hover:bg-bg'}`}>
+                <input
+                  type="checkbox"
+                  checked={marked}
+                  disabled={blocked}
+                  onChange={() => setRemoveIds(marked ? removeIds.filter((id) => id !== m.id) : [...removeIds, m.id])}
+                  className="accent-[var(--red)]"
+                />
+                <span className={`truncate ${marked ? 'text-red line-through' : ''}`}>{m.name}</span>
+              </label>
+            )
+          })}
       </div>
 
       <label className="mt-6 flex cursor-pointer items-center gap-2.5 text-sm">

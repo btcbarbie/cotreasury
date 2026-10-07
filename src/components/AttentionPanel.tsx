@@ -15,6 +15,7 @@ type Proposal = {
   approvals: { memberId: string; decision: string }[]
   recipients: { name: string; receiver: string; amountCents: number; status: string }[]
   failureReason: string | null
+  panel: { size: number; iAmReviewer: boolean; canVote: boolean } | null
 }
 type Entry = { id: string; type: string; status: string; amountCents: number; counterparty: string | null; createdAt: string }
 
@@ -30,7 +31,7 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
     const yes = x.approvals.filter((a) => a.decision === 'APPROVE').length
     const label = x.kind === 'RULE_CHANGE' ? 'Rule change' : `${x.title} · ${m(x.amountCents)}`
     if (x.status === 'PENDING_APPROVAL') {
-      const mine = isApprover && x.proposedById !== p.viewerId && !x.approvals.some((a) => a.memberId === p.viewerId)
+      const mine = x.panel ? x.panel.canVote : isApprover && x.proposedById !== p.viewerId && !x.approvals.some((a) => a.memberId === p.viewerId)
       items.push({
         key: `p-${x.id}`,
         group: 'Needs approval',
@@ -38,7 +39,9 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
         Icon: x.kind === 'RULE_CHANGE' ? Scale : mine ? UserCheck : Hourglass,
         title: label,
         detail: mine
-          ? `Your sign-off is needed. ${yes} of ${x.requiredApprovals} approvals so far.`
+          ? x.panel
+            ? `You were drawn for the review panel. ${yes} of ${x.requiredApprovals} approvals so far.`
+            : `Your sign-off is needed. ${yes} of ${x.requiredApprovals} approvals so far.`
           : `Needs ${x.requiredApprovals - yes} more approval${x.requiredApprovals - yes === 1 ? '' : 's'}${x.proposedById === p.viewerId ? '. You created it, so others must approve.' : '.'}`,
         action: 'requests',
       })

@@ -25,6 +25,9 @@ model Collective {
   // Seeded showcase treasuries are listed for every visitor; user-created ones
   // only for the browser that created them.
   isDemo      Boolean  @default(false)
+  // Who reviews spending: "FIXED" approvers, a "RANDOM" hidden panel drawn
+  // from all members, or "MIXED" (one seat from the approvers, the rest random).
+  approvalMode String  @default("FIXED")
   createdAt   DateTime @default(now())
 
   members     Member[]
@@ -49,6 +52,7 @@ model Member {
   entries      LedgerEntry[]
   approvals    Approval[]
   proposals    Proposal[] @relation("ProposedBy")
+  reviewSeats  ProposalReviewer[]
 
   @@unique([collectiveId, email])
 }
@@ -110,6 +114,10 @@ model Proposal {
   payoutAttempts    Int      @default(0)
   executedAt        DateTime? // when the PayPal payout batch was sent
   failureReason     String?
+  // Random review panel: the secret seed is revealed after the decision; its
+  // hash is sealed in the activity log when the panel is drawn.
+  panelSeed         String?
+  panelCommitment   String?
   createdAt         DateTime @default(now())
 
   collective        Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
@@ -117,6 +125,7 @@ model Proposal {
   recipients        PayoutRecipient[]
   approvals         Approval[]
   entries           LedgerEntry[]
+  reviewers         ProposalReviewer[]
 }
 
 model PayoutRecipient {
@@ -189,4 +198,21 @@ model AuditEvent {
   collective   Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
 
   @@unique([collectiveId, seq])
+}
+
+// A seat on a request's random review panel. Hidden from everyone but the
+// reviewer until the request is decided.
+model ProposalReviewer {
+  id         String   @id @default(cuid())
+  proposalId String
+  memberId   String
+  seat       String   // "OFFICER" (drawn from approvers) | "MEMBER" (drawn from everyone else)
+  status     String   @default("ACTIVE") // "ACTIVE" | "VOTED" | "REPLACED"
+  assignedAt DateTime @default(now())
+  expiresAt  DateTime
+
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, memberId])
 }

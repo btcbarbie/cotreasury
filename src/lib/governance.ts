@@ -7,10 +7,19 @@ import { formatMoney } from './money'
 
 export type Flag = { code: string; message: string; extraApproval: boolean }
 
+export type ApprovalMode = 'FIXED' | 'RANDOM' | 'MIXED'
+export const APPROVAL_MODE_LABEL: Record<ApprovalMode, string> = {
+  FIXED: 'Fixed approvers',
+  RANDOM: 'Random review panel',
+  MIXED: 'Mixed panel (1 officer + random members)',
+}
+
 export type RulesPayload = {
   tiers: { minCents: number; maxCents: number | null; requiredApprovals: number }[]
   approverIds: string[]
   newPayeeRule: boolean
+  approvalMode?: ApprovalMode
+  removeMemberIds?: string[]
 }
 
 type Recipient = { name: string; receiver: string; amountCents: number }
@@ -19,7 +28,7 @@ async function loadCollective(collectiveId: string) {
   return prisma.collective.findUniqueOrThrow({
     where: { id: collectiveId },
     include: {
-      members: true,
+      members: { where: { role: { not: 'FORMER' } } },
       tiers: { orderBy: { minCents: 'asc' } },
       entries: true,
       proposals: { include: { recipients: true } },
@@ -98,6 +107,8 @@ export async function ruleChangeApprovals(collectiveId: string, makerId: string)
 
 /** Validate a proposed rule set. Returns an error message, or null if it's sound. */
 export function validateRules(rules: RulesPayload, memberIds: Set<string>): string | null {
+  if (rules.approvalMode && !['FIXED', 'RANDOM', 'MIXED'].includes(rules.approvalMode)) return 'Unknown approval mode.'
+  if ((rules.removeMemberIds ?? []).some((id) => rules.approverIds.includes(id))) return 'Remove someone from the approvers before removing them from the group.'
   if (rules.approverIds.length < 2) return 'Keep at least two approvers so no one can approve alone.'
   if (rules.approverIds.some((id) => !memberIds.has(id))) return 'Approvers must be members of the group.'
   const tiers = [...rules.tiers].sort((a, b) => a.minCents - b.minCents)
@@ -133,5 +144,9 @@ export function describeRuleChange(current: RulesPayload, next: RulesPayload, na
   if (added.length) lines.push(`Add approver${added.length > 1 ? 's' : ''}: ${added.map((id) => names.get(id)).join(', ')}`)
   if (removed.length) lines.push(`Remove approver${removed.length > 1 ? 's' : ''}: ${removed.map((id) => names.get(id)).join(', ')}`)
   if (current.newPayeeRule !== next.newPayeeRule) lines.push(`New-recipient extra approval: ${next.newPayeeRule ? 'on' : 'off'}`)
+  const fromMode = current.approvalMode ?? 'FIXED'
+  const toMode = next.approvalMode ?? fromMode
+  if (fromMode !== toMode) lines.push(`Who reviews payouts: ${APPROVAL_MODE_LABEL[fromMode]} → ${APPROVAL_MODE_LABEL[toMode]}`)
+  if (next.removeMemberIds?.length) lines.push(`Remove from the group: ${next.removeMemberIds.map((id) => names.get(id)).join(', ')}`)
   return lines
 }

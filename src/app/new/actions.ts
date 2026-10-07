@@ -16,6 +16,7 @@ export type NewTreasury = {
   people: { name: string; email: string; role: 'APPROVER' | 'MEMBER' }[]
   tiers: { minCents: number; maxCents: number | null; requiredApprovals: number }[]
   newPayeeRule: boolean
+  approvalMode?: 'FIXED' | 'RANDOM' | 'MIXED'
   paypalEmail: string
 }
 
@@ -59,6 +60,7 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
       kind: input.kind,
       paypalEmail,
       newPayeeRule: !!input.newPayeeRule,
+      approvalMode: ['RANDOM', 'MIXED'].includes(input.approvalMode ?? '') ? input.approvalMode! : 'FIXED',
       tiers: { create: tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals })) },
       members: {
         create: [{ name: creator.name, email: creator.email, role: 'ADMIN' }, ...people],
@@ -79,7 +81,7 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
     action: 'RULES_SET',
     summary: `set the spending rules: ${tiers
       .map((t) => `${t.maxCents === null ? `${formatMoney(t.minCents, 'USD')}+` : `${formatMoney(t.minCents, 'USD')}–${formatMoney(t.maxCents, 'USD')}`} needs ${t.requiredApprovals}`)
-      .join('; ')}${input.newPayeeRule ? '; +1 for new recipients' : ''}`,
+      .join('; ')}${input.newPayeeRule ? '; +1 for new recipients' : ''}; payouts reviewed by ${input.approvalMode === 'RANDOM' ? 'a random review panel' : input.approvalMode === 'MIXED' ? 'a mixed panel' : 'the fixed approvers'}`,
     data: { tiers, newPayeeRule: !!input.newPayeeRule },
   })
 

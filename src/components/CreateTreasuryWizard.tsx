@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, GraduationCap, HandHeart, Loader2, Plus, 
 import { createTreasury, type NewTreasury } from '@/app/new/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar } from './ui'
+import { MODES } from './RulesPanel'
 
 const STEPS = ['Purpose', 'People', 'Rules', 'PayPal', 'Review'] as const
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -50,6 +51,7 @@ export function CreateTreasuryWizard() {
   const [preset, setPreset] = useState<'light' | 'balanced' | 'strict'>('balanced')
   const [rows, setRows] = useState<TierRow[] | null>(null)
   const [newPayeeRule, setNewPayeeRule] = useState(true)
+  const [approvalMode, setApprovalMode] = useState<'FIXED' | 'RANDOM' | 'MIXED'>('FIXED')
   const [paypalEmail, setPaypalEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -107,6 +109,7 @@ export function CreateTreasuryWizard() {
       people: filled,
       tiers,
       newPayeeRule,
+      approvalMode,
       paypalEmail: paypalEmail || creator.email,
     }
     setError(null)
@@ -293,6 +296,21 @@ export function CreateTreasuryWizard() {
                 <span className="block text-muted">The first payment to someone the treasury has never paid needs one more sign-off.</span>
               </span>
             </label>
+            <div className="mt-5 label">Who reviews payouts</div>
+            <div className="mt-2 grid gap-2">
+              {MODES.map((m) => (
+                <label key={m.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${approvalMode === m.id ? 'border-ink bg-bg' : 'border-line'}`}>
+                  <input type="radio" name="mode" checked={approvalMode === m.id} onChange={() => setApprovalMode(m.id as typeof approvalMode)} className="mt-0.5 accent-[var(--accent)]" />
+                  <span>
+                    <span className="font-medium">{m.label}</span>
+                    <span className="block text-muted">{m.hint}</span>
+                  </span>
+                </label>
+              ))}
+              {approvalMode !== 'FIXED' && filled.length + 1 < 8 && (
+                <p className="text-xs text-amber">With {filled.length + 1} people it&apos;s easy to guess who was drawn. Random panels work best from about 8 members; you can switch later.</p>
+              )}
+            </div>
             <div className="mt-4 flex items-start gap-2 rounded-xl bg-accent-soft px-3 py-2.5 text-sm text-accent">
               <ShieldCheck size={16} className="mt-0.5 shrink-0" />
               Always on: no one approves their own request, and anyone paying themselves needs an extra approval.
@@ -369,6 +387,7 @@ export function CreateTreasuryWizard() {
                     </li>
                   ))}
                   {newPayeeRule && <li className="text-muted">+1 approval for first payments to new recipients</li>}
+                  <li className="text-muted">Reviewed by: {MODES.find((m) => m.id === approvalMode)?.label}</li>
                 </ul>
               </div>
               <div className="flex items-center gap-3 rounded-xl bg-bg p-3.5">

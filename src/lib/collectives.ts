@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import { computeTreasury } from './treasury'
+import { refreshPanels } from './panel'
 
 export function viewerCookieName(collectiveId: string) {
   return `tp_viewer_${collectiveId}`
@@ -21,7 +22,7 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
     include: {
       entries: { select: { direction: true, status: true, amountCents: true } },
       proposals: { select: { status: true, amountCents: true } },
-      _count: { select: { members: true, events: true } },
+      _count: { select: { members: { where: { role: { not: 'FORMER' } } }, events: true } },
       members: { where: { role: 'ADMIN' }, select: { id: true, name: true }, take: 1 },
     },
   })
@@ -40,10 +41,12 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
 }
 
 export async function getCollectiveView(id: string) {
+  // Lazily replace panel reviewers whose 48-hour window passed without a vote.
+  await refreshPanels(id)
   const collective = await prisma.collective.findUnique({
     where: { id },
     include: {
-      members: { orderBy: { createdAt: 'asc' } },
+      members: { where: { role: { not: 'FORMER' } }, orderBy: { createdAt: 'asc' } },
       tiers: { orderBy: { minCents: 'asc' } },
       goals: { orderBy: { createdAt: 'asc' } },
       events: { orderBy: { seq: 'desc' }, take: 100 },
@@ -65,6 +68,7 @@ export async function getCollectiveView(id: string) {
         include: {
           approvals: { include: { member: { select: { name: true } } } },
           recipients: true,
+          reviewers: { select: { memberId: true, status: true, seat: true } },
           proposedBy: { select: { name: true } },
         },
       },
@@ -94,6 +98,6 @@ export type CollectiveView = NonNullable<Awaited<ReturnType<typeof getCollective
 export async function getViewer(collectiveId: string) {
   const jar = await cookies()
   const viewerId = jar.get(viewerCookieName(collectiveId))?.value
-  const members = await prisma.member.findMany({ where: { collectiveId }, orderBy: { createdAt: 'asc' } })
+  const members = await prisma.member.findMany({ where: { collectiveId, role: { not: 'FORMER' } }, orderBy: { createdAt: 'asc' } })
   return members.find((m) => m.id === viewerId) ?? members.find((m) => m.role === 'ADMIN') ?? members[0] ?? null
 }
