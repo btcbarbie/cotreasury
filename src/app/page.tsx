@@ -53,10 +53,12 @@ export default function Home() {
         <div className="pointer-events-none absolute -top-10 right-0 -z-10 h-72 w-72 rounded-full bg-violet/10 blur-3xl sm:h-96 sm:w-96" />
         <div className="pointer-events-none absolute top-24 -left-10 -z-10 h-56 w-56 rounded-full bg-teal/10 blur-3xl" />
         <span className="pill pill-violet mb-5">Shared purpose. Shared treasury. Collective control.</span>
-        <h1 className="max-w-3xl text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">
-          A treasury governed by the{' '}
-          <span className="bg-gradient-to-r from-accent via-teal to-violet bg-clip-text text-transparent">collective it serves.</span>
+        <h1 className="text-5xl font-semibold leading-none tracking-tight sm:text-7xl">
+          <span className="bg-gradient-to-r from-accent via-teal to-violet bg-clip-text text-transparent">CoTreasury</span>
         </h1>
+        <p className="mt-4 max-w-3xl text-2xl font-semibold leading-snug tracking-tight sm:text-4xl">
+          A treasury governed by the collective it serves.
+        </p>
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
           When people share a purpose, managing the money shouldn&apos;t depend on one person. CoTreasury gives groups a shared
           financial layer to coordinate contributions, understand their treasury, govern spending, and act together, with AI
