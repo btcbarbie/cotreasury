@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { Loader2, Pencil, Plus, UserPlus, X } from 'lucide-react'
-import { addMember, updateTreasuryDetails } from '@/app/c/[id]/actions'
+import { useState, useSyncExternalStore, useTransition } from 'react'
+import { Check, Copy, Link2, Loader2, Pencil, Plus, RotateCcw, UserPlus, X } from 'lucide-react'
+import { addMember, setInviteLink, updateTreasuryDetails } from '@/app/c/[id]/actions'
 
 /** Name and purpose: the admin edits directly; the change is sealed in the activity log. */
 export function TreasuryDetailsCard({ collectiveId, name, purpose, isAdmin }: { collectiveId: string; name: string; purpose: string; isAdmin: boolean }) {
@@ -112,6 +112,73 @@ export function AddMemberButton({ collectiveId }: { collectiveId: string }) {
         </button>
       </div>
       <p className="mt-2 text-xs text-muted">They join as a member who can contribute and see everything. To make them an approver, propose a rule change.</p>
+      {error && <div className="mt-2 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
+    </div>
+  )
+}
+
+const noopSubscribe = () => () => {}
+
+/** Admin: a shareable link anyone can use to join as a member. */
+export function InviteLinkCard({ collectiveId, code }: { collectiveId: string; code: string | null }) {
+  const [pending, start] = useTransition()
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // The site's own address, read after hydration so server and client render the same.
+  const origin = useSyncExternalStore(noopSubscribe, () => window.location.origin, () => '')
+  const url = code ? `${origin}/join/${code}` : ''
+
+  function set(on: boolean) {
+    setError(null)
+    start(async () => {
+      const r = await setInviteLink(collectiveId, on)
+      if (!r.ok) setError(r.error)
+    })
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Couldn’t copy. Select the link and copy it manually.')
+    }
+  }
+
+  return (
+    <div className="card mb-4 p-4">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <Link2 size={15} className="text-muted" /> Invite link
+      </div>
+      {code ? (
+        <>
+          <div className="mt-3 flex gap-2">
+            <input className="input min-w-0 flex-1 font-mono !text-xs" readOnly value={url} onFocus={(e) => e.target.select()} aria-label="Invite link" />
+            <button className="btn btn-primary !h-10" onClick={copy}>
+              {copied ? <Check size={14} strokeWidth={3} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted">Anyone with this link can join as a member. Share it in your group chat or email.</p>
+            <div className="flex gap-3 text-xs">
+              <button className="inline-flex items-center gap-1 text-muted hover:text-ink" onClick={() => set(true)} disabled={pending}>
+                <RotateCcw size={12} /> Reset link
+              </button>
+              <button className="text-muted hover:text-red" onClick={() => set(false)} disabled={pending}>
+                Turn off
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted">Create a link to share in your group chat. Whoever opens it can join as a member.</p>
+          <button className="btn btn-ghost !h-8" onClick={() => set(true)} disabled={pending}>
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />} Create invite link
+          </button>
+        </div>
+      )}
       {error && <div className="mt-2 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
     </div>
   )

@@ -37,7 +37,9 @@ async function CollectiveContent({
 }) {
   await connection() // live treasury data and today's date: always render per request
   const { id } = await params
-  const justCreated = (await searchParams).created === '1'
+  const sp = await searchParams
+  const justCreated = sp.created === '1'
+  const justJoined = sp.joined === '1'
   const [view, account] = await Promise.all([getCollectiveView(id), getMerchantAccount()])
   if (!view) notFound()
   const { collective, viewer, treasury } = view
@@ -162,6 +164,15 @@ async function CollectiveContent({
         </div>
       )}
 
+      {justJoined && (
+        <div className="mt-6 flex items-start gap-3 rounded-[14px] border border-accent/25 bg-accent-soft px-4 py-3 text-sm text-accent">
+          <PartyPopper size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <div className="font-medium">Welcome to {collective.name}, {viewer.name.split(' ')[0]}.</div>
+            <div className="text-accent/80">You can see every dollar in and out, add funds, and request payouts. Ask the AI Treasurer anything about the money.</div>
+          </div>
+        </div>
+      )}
       {justCreated && (
         <div className="mt-6 flex items-start gap-3 rounded-[14px] border border-accent/25 bg-accent-soft px-4 py-3 text-sm text-accent">
           <PartyPopper size={18} className="mt-0.5 shrink-0" />
@@ -188,6 +199,7 @@ async function CollectiveContent({
         currency={cur}
         viewerId={viewer.id}
         viewerRole={viewer.role}
+        inviteCode={viewer.role === 'ADMIN' ? collective.inviteCode : null}
         members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role }))}
         tiers={collective.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals }))}
         entries={collective.entries.map((e) => {

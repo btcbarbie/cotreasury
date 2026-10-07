@@ -7,7 +7,7 @@ import { decideRequest, refreshCollective, retryRequestPayout } from '@/app/c/[i
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
-import { AddMemberButton, TreasuryDetailsCard } from './SettingsPanels'
+import { AddMemberButton, InviteLinkCard, TreasuryDetailsCard } from './SettingsPanels'
 import { OverviewPanel } from './OverviewPanel'
 import { CollapsibleSection, MinimizeButton } from './Collapsible'
 import { TreasurerPanel } from './TreasurerPanel'
@@ -57,6 +57,7 @@ export function CollectiveTabs(props: {
   currency: string
   viewerId: string
   viewerRole: string
+  inviteCode: string | null
   goals: GoalProgress[]
   events: ActivityEvent[]
   members: Member[]
@@ -181,6 +182,7 @@ export function CollectiveTabs(props: {
               count={props.members.length}
               actions={props.viewerRole === 'ADMIN' ? <AddMemberButton collectiveId={props.collectiveId} /> : undefined}
             >
+              {props.viewerRole === 'ADMIN' && <InviteLinkCard collectiveId={props.collectiveId} code={props.inviteCode} />}
               <MembersPanel members={props.members} />
             </CollapsibleSection>
             <CollapsibleSection title="Rules & governance">

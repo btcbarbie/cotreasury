@@ -1,5 +1,6 @@
 'use server'
 
+import { randomBytes } from 'crypto'
 import { cookies } from 'next/headers'
 import { refresh } from 'next/cache'
 import { prisma } from '@/lib/prisma'
@@ -11,6 +12,7 @@ import { executePayout, retryPayout } from '@/lib/payouts'
 import { drawPanel, revealPanel, REVIEW_WINDOW_HOURS } from '@/lib/panel'
 import { closeRejected, votersLeft } from '@/lib/voting'
 import { recordEvent } from '@/lib/audit'
+import { admitMember } from '@/lib/members'
 import { formatMoney } from '@/lib/money'
 
 // Demo-mode identity switch: lets a judge act as different members (e.g. three
@@ -318,16 +320,23 @@ export async function updateTreasuryDetails(collectiveId: string, input: { name:
 export async function addMember(collectiveId: string, input: { name: string; email: string }): Promise<Result> {
   const viewer = await getViewer(collectiveId)
   if (!viewer || viewer.role !== 'ADMIN') return { ok: false, error: 'Only the admin can add members.' }
-  const name = input.name?.trim() ?? ''
-  const email = input.email?.trim().toLowerCase() ?? ''
-  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'Add a name and a valid email.' }
-  const existing = await prisma.member.findUnique({ where: { collectiveId_email: { collectiveId, email } } })
-  if (existing && existing.role !== 'FORMER') return { ok: false, error: 'Someone with that email is already a member.' }
-  // New members start with nothing unread: they only hear about what happens after they join.
-  const head = await prisma.auditEvent.findFirst({ where: { collectiveId }, orderBy: { seq: 'desc' }, select: { seq: true } })
-  if (existing) await prisma.member.update({ where: { id: existing.id }, data: { name, role: 'MEMBER', lastSeenSeq: head?.seq ?? 0 } })
-  else await prisma.member.create({ data: { collectiveId, name, email, role: 'MEMBER', lastSeenSeq: head?.seq ?? 0 } })
-  await recordEvent(collectiveId, { actor: viewer.name, action: 'MEMBER_ADDED', summary: `added ${name} to the group`, data: { email } })
+  const r = await admitMember(collectiveId, input, { actor: viewer.name, action: 'MEMBER_ADDED', summary: (name) => `added ${name} to the group` })
+  if (!r.ok) return r
+  refresh()
+  return { ok: true }
+}
+
+/** Admin: create or reset the invite link (the old one stops working), or turn it off. */
+export async function setInviteLink(collectiveId: string, on: boolean): Promise<Result> {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer || viewer.role !== 'ADMIN') return { ok: false, error: 'Only the admin can manage the invite link.' }
+  const before = await prisma.collective.findUnique({ where: { id: collectiveId }, select: { inviteCode: true } })
+  await prisma.collective.update({ where: { id: collectiveId }, data: { inviteCode: on ? randomBytes(12).toString('base64url') : null } })
+  await recordEvent(collectiveId, {
+    actor: viewer.name,
+    action: on ? 'INVITE_LINK_CREATED' : 'INVITE_LINK_DISABLED',
+    summary: on ? (before?.inviteCode ? 'reset the invite link; the old link no longer works' : 'created an invite link for new members') : 'turned off the invite link',
+  })
   refresh()
   return { ok: true }
 }

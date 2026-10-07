@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowDownLeft, Bell, Check, FileText, Scale, Send, Target, X } from 'lucide-react'
+import { AlertTriangle, ArrowDownLeft, Bell, Check, FileText, Scale, Send, Target, UserPlus, X } from 'lucide-react'
 import { markNotificationsSeen } from '@/app/c/[id]/actions'
 import type { MemberNotification } from '@/lib/notifications'
 
@@ -20,6 +20,7 @@ const LOOK: Record<string, { Icon: typeof Bell; tone: string }> = {
   RULE_CHANGE_PROPOSED: { Icon: Scale, tone: 'bg-violet-soft text-violet' },
   RULES_CHANGED: { Icon: Scale, tone: 'bg-violet-soft text-violet' },
   GOAL_CREATED: { Icon: Target, tone: 'bg-teal-soft text-teal' },
+  MEMBER_JOINED: { Icon: UserPlus, tone: 'bg-accent-soft text-accent' },
   UNAPPROVED_MOVEMENT: { Icon: AlertTriangle, tone: 'bg-red-soft text-red' },
 }
 
