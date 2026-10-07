@@ -32,8 +32,8 @@ const PILLARS = [
     tone: 'bg-blue-soft text-blue',
   },
   {
-    title: 'Everyone can see what happened',
-    body: 'A shared ledger.',
+    title: 'A shared ledger',
+    body: 'Everyone can see where the money went.',
     Icon: BookOpen,
     tone: 'bg-teal-soft text-teal',
   },
