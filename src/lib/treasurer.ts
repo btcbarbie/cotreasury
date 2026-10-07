@@ -23,13 +23,34 @@ export type DraftRequest = {
   flags: Flag[]
 }
 
+// A contribution the AI has lined up. Paying it still happens in PayPal, by the member.
+export type ContributionDraft = { amountCents: number; goalId: string | null; goalTitle: string | null }
+
 export type TreasurerReply = {
   answer: string
   checks: string[] // human-readable trace of what the Treasurer looked at
   draft: DraftRequest | null
+  contribution: ContributionDraft | null
 }
 
+export type Viewer = { id: string; name: string; role: string }
+
 const TOOLS: Anthropic.Beta.BetaTool[] = [
+  {
+    name: 'prepare_contribution',
+    description:
+      "Line up a contribution for the member you're talking to, so they can pay it with PayPal in one click. This does NOT take any money: the member still confirms and pays in PayPal themselves. Use goal_title to attribute it to one of the collective's goals (exact title from the treasury state), or omit it for the general fund.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        amount_cents: { type: 'integer', description: 'Amount in cents' },
+        goal_title: { type: 'string', description: 'Exact goal title, or empty for the general fund' },
+      },
+      required: ['amount_cents', 'goal_title'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
   {
     name: 'get_treasury_state',
     description:
@@ -90,6 +111,9 @@ How you work:
 - The group runs bank-style dual controls (see other_controls and new_recipient_rule in the treasury state). When a draft carries risk flags, say which ones and why they change the number of approvals.
 - If something is not affordable, say so and suggest what would be (e.g. fewer awards), using check_affordability to confirm.
 - When drafting payouts to named people without emails, use placeholder emails like firstname.lastname@example.com and mention they must be confirmed before submitting.
+- You are talking to the member described in "you_are" in the treasury state. "I", "me" and "my" mean them.
+- To help someone add funds: work out which goal and how much (their outstanding amount is in you_are.owes), confirm if unclear, then call prepare_contribution. They pay in PayPal themselves.
+- To help someone request a payout: you need who is being paid, their PayPal email, the amount, and what it's for. Ask for whatever is missing, one short question at a time, then call check_affordability and draft_spending_request.
 - Be brief: 2–5 short sentences, plain language, no headings. Use **bold** sparingly for key figures.`
 
 async function loadState(collectiveId: string) {
@@ -106,7 +130,7 @@ async function loadState(collectiveId: string) {
   return { c, treasury: computeTreasury(c.entries, c.proposals) }
 }
 
-async function runTool(collectiveId: string, name: string, input: Record<string, unknown>) {
+async function runTool(collectiveId: string, name: string, input: Record<string, unknown>, viewer: Viewer | null) {
   const { c, treasury } = await loadState(collectiveId)
   const cur = c.currency
   const approvers = c.members.filter((m) => canApprove(m.role))
@@ -133,6 +157,19 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
           'Rule and approver changes must be approved at the strictest tier before they take effect',
         ],
         member_count: c.members.length,
+        you_are: viewer
+          ? {
+              name: viewer.name,
+              role: viewer.role === 'MEMBER' ? 'member (cannot approve)' : 'approver',
+              owes: goalProgress(c.goals, c.members, c.entries)
+                .map((g) => {
+                  const me = g.members.find((m) => m.id === viewer.id)
+                  const left = me ? Math.max(0, g.expectedPerMemberCents - me.paidCents) : 0
+                  return { goal: g.title, still_to_pay: formatMoney(left, cur) }
+                })
+                .filter((x) => x.still_to_pay !== formatMoney(0, cur)),
+            }
+          : null,
         goals: goalProgress(c.goals, c.members, c.entries).map((g) => ({
           title: g.title,
           type: g.kind === 'MONTHLY' ? `monthly pledge (month ${g.monthsDue})` : 'one-off goal',
@@ -222,16 +259,32 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
     }
   }
 
+  if (name === 'prepare_contribution') {
+    const amount = Math.round(Number(input.amount_cents))
+    if (!(amount >= 100 && amount <= 1_000_000)) return { result: { error: 'Contributions must be between $1 and $10,000.' }, check: 'Contribution not prepared' }
+    const title = String(input.goal_title ?? '').trim()
+    const goal = title ? c.goals.find((g) => g.title.toLowerCase() === title.toLowerCase()) : null
+    if (title && !goal) return { result: { error: `No goal called "${title}". Goals: ${c.goals.map((g) => g.title).join(', ') || 'none'}.` }, check: 'Contribution not prepared' }
+    const contribution: ContributionDraft = { amountCents: amount, goalId: goal?.id ?? null, goalTitle: goal?.title ?? null }
+    return {
+      result: { prepared: true, amount: formatMoney(amount, cur), for: goal?.title ?? 'general fund', note: 'Shown to the member with a Pay with PayPal button. Nothing has been paid.' },
+      check: `Lined up ${formatMoney(amount, cur)} for ${goal?.title ?? 'the general fund'}`,
+      contribution,
+    }
+  }
+
   return { result: { error: `Unknown tool ${name}` }, check: `Unknown tool ${name}` }
 }
 
 export async function askTreasurer(
   collectiveId: string,
   history: { role: 'user' | 'assistant'; content: string }[],
+  viewer: Viewer | null = null,
 ): Promise<TreasurerReply> {
   const messages: Anthropic.Beta.BetaMessageParam[] = history.map((m) => ({ role: m.role, content: m.content }))
   const checks: string[] = []
   let draft: DraftRequest | null = null
+  let contribution: ContributionDraft | null = null
 
   for (let turn = 0; turn < 6; turn++) {
     // Server-side refusal fallback: if a safety classifier declines, the API
@@ -248,7 +301,7 @@ export async function askTreasurer(
     })
 
     if (response.stop_reason === 'refusal') {
-      return { answer: "I can't help with that request.", checks, draft }
+      return { answer: "I can't help with that request.", checks, draft, contribution }
     }
 
     const toolUses = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use')
@@ -258,16 +311,17 @@ export async function askTreasurer(
         .map((b) => b.text)
         .join('\n')
         .trim()
-      return { answer: answer || 'Done.', checks, draft }
+      return { answer: answer || 'Done.', checks, draft, contribution }
     }
 
     messages.push({ role: 'assistant', content: response.content })
     const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
     for (const t of toolUses) {
       try {
-        const out = await runTool(collectiveId, t.name, (t.input ?? {}) as Record<string, unknown>)
+        const out = await runTool(collectiveId, t.name, (t.input ?? {}) as Record<string, unknown>, viewer)
         checks.push(out.check)
         if ('draft' in out && out.draft) draft = out.draft
+        if ('contribution' in out && out.contribution) contribution = out.contribution
         results.push({ type: 'tool_result', tool_use_id: t.id, content: JSON.stringify(out.result) })
       } catch (e) {
         results.push({ type: 'tool_result', tool_use_id: t.id, content: (e as Error).message, is_error: true })
@@ -275,5 +329,5 @@ export async function askTreasurer(
     }
     messages.push({ role: 'user', content: results })
   }
-  return { answer: 'I ran out of steps working on that. Try a more specific question.', checks, draft }
+  return { answer: 'I ran out of steps working on that. Try a more specific question.', checks, draft, contribution }
 }

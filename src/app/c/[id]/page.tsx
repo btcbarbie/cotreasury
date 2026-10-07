@@ -153,6 +153,8 @@ async function CollectiveContent({
 
       <CollectiveTabs
         collectiveId={collective.id}
+        kind={collective.kind}
+        viewerName={viewer.name}
         currency={cur}
         viewerId={viewer.id}
         viewerRole={viewer.role}

@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { AlertTriangle, Check, Loader2, RotateCcw, Scale, Send, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, Check, Loader2, RotateCcw, Scale, Send, X } from 'lucide-react'
 import { decideRequest, refreshCollective, retryRequestPayout } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
 import { OverviewPanel } from './OverviewPanel'
+import { TreasurerPanel } from './TreasurerPanel'
 import { AttentionPanel, attentionItems } from './AttentionPanel'
 import { ActivityPanel, type ActivityEvent } from './ActivityPanel'
 import type { GoalProgress } from '@/lib/goals'
@@ -44,6 +45,8 @@ type Tab = (typeof TABS)[number]
 
 export function CollectiveTabs(props: {
   collectiveId: string
+  kind: string
+  viewerName: string
   currency: string
   viewerId: string
   viewerRole: string
@@ -119,6 +122,15 @@ export function CollectiveTabs(props: {
             <section>
               <h3 className="mb-1 font-semibold tracking-tight">Requests</h3>
               <p className="mb-3 text-sm text-muted">Anyone can ask to spend; approvers decide; the final approval pays through PayPal.</p>
+              <div className="mb-4">
+                <TreasurerPanel
+                  variant="assistant"
+                  collectiveId={props.collectiveId}
+                  kind={props.kind}
+                  currency={props.currency}
+                  brief={`Hi ${props.viewerName.split(' ')[0]}. Tell me what you need: I can **request a payout** for you (I'll ask who, how much and why) or **add funds** to the pool, including anything you still owe for a goal.`}
+                />
+              </div>
               <RequestsPanel
                 proposals={props.proposals}
                 currency={props.currency}
@@ -197,17 +209,7 @@ function RequestsPanel({
   const approvers = members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN')
   return (
     <div className="grid gap-3">
-      {proposals.length === 0 && (
-        <div className="card flex flex-col items-center px-6 py-12 text-center">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-soft text-violet">
-            <Sparkles size={18} />
-          </span>
-          <div className="mt-4 font-medium">No spending requests yet</div>
-          <p className="mt-1 max-w-sm text-sm text-muted">
-            Use Request payout at the top, or ask the AI Treasurer whether the group can afford something and it will draft the request for you.
-          </p>
-        </div>
-      )}
+      {proposals.length === 0 && <p className="px-1 text-sm text-faint">No spending requests yet.</p>}
       {proposals.map((p) => (
         <RequestCard key={p.id} p={p} currency={currency} viewerId={viewerId} viewerRole={viewerRole} approvers={approvers} />
       ))}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { askTreasurer } from '@/lib/treasurer'
+import { getViewer } from '@/lib/collectives'
 
 export const maxDuration = 60
 
@@ -16,7 +17,8 @@ export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id
   // Keep the conversation short and text-only; tool calls are re-run fresh each turn.
   const trimmed = history.slice(-8).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }))
   try {
-    return NextResponse.json(await askTreasurer(id, trimmed))
+    const viewer = await getViewer(id)
+    return NextResponse.json(await askTreasurer(id, trimmed, viewer ? { id: viewer.id, name: viewer.name, role: viewer.role } : null))
   } catch (e) {
     console.error('Treasurer error', e)
     return NextResponse.json({ error: 'The Treasurer is unavailable right now.' }, { status: 502 })
