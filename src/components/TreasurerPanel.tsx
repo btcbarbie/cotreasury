@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { AlertTriangle, ArrowUp, Check, FileText, HandCoins, Loader2, Sparkles, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { submitRequest } from '@/app/c/[id]/actions'
+import { MinimizeButton } from './Collapsible'
 import type { ContributionDraft, DraftRequest, TreasurerReply } from '@/lib/treasurer'
 
 type Turn = { role: 'user'; content: string } | ({ role: 'assistant'; content: string } & Omit<TreasurerReply, 'answer'>)
@@ -60,6 +61,7 @@ export function TreasurerPanel({
   variant?: 'treasurer' | 'assistant'
 }) {
   const assistant = variant === 'assistant'
+  const [minimized, setMinimized] = useState(false)
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
@@ -101,7 +103,7 @@ export function TreasurerPanel({
 
   return (
     <section className={`treasurer-card overflow-hidden rounded-[16px] border ${assistant ? '' : 'mt-6'}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5">
+      <div className={`flex flex-wrap items-start justify-between gap-3 px-5 pt-5 ${minimized ? 'pb-5' : ''}`}>
         <div className="flex items-center gap-3">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet text-white shadow-[0_4px_14px_rgba(109,74,255,0.35)]">
             <Sparkles size={17} />
@@ -116,7 +118,10 @@ export function TreasurerPanel({
         <span className="pill pill-violet">
           <span className="h-1.5 w-1.5 rounded-full bg-violet animate-pulse" /> Watching the ledger
         </span>
+        <MinimizeButton open={!minimized} onToggle={() => setMinimized(!minimized)} label={assistant ? 'payment assistant' : 'AI Treasurer'} />
       </div>
+      {!minimized && (
+        <>
 
       <div ref={scrollRef} className="max-h-[420px] overflow-y-auto px-5 pt-4">
         {turns.length === 0 ? (
@@ -196,6 +201,8 @@ export function TreasurerPanel({
           </button>
         </form>
       </div>
+        </>
+      )}
     </section>
   )
 }

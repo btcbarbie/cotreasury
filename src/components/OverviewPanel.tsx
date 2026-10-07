@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CalendarClock, Check, Loader2, Plus, Repeat, Target, X } from 'lucide-react'
+import { CalendarClock, Check, ChevronDown, Loader2, Plus, Repeat, Target, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { addGoal } from '@/app/c/[id]/actions'
 import type { GoalProgress } from '@/lib/goals'
@@ -21,21 +21,26 @@ export function OverviewPanel({
   viewerId: string
 }) {
   const [adding, setAdding] = useState(false)
+  const [open, setOpen] = useState(true)
 
   return (
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-semibold tracking-tight">What the collective is working towards</h3>
-        {canManage && !adding && (
+        <button type="button" onClick={() => setOpen(!open)} className="flex items-center gap-1.5 text-left font-semibold tracking-tight">
+          <ChevronDown size={16} className={`text-muted transition-transform ${open ? '' : '-rotate-90'}`} />
+          What the collective is working towards
+          <span className="tabular text-sm font-normal text-muted">{goals.length}</span>
+        </button>
+        {open && canManage && !adding && (
           <button className="btn btn-ghost !h-8" onClick={() => setAdding(true)}>
             <Plus size={14} /> Add goal
           </button>
         )}
       </div>
 
-      {adding && <GoalForm collectiveId={collectiveId} onClose={() => setAdding(false)} />}
+      {open && adding && <GoalForm collectiveId={collectiveId} onClose={() => setAdding(false)} />}
 
-      {goals.length === 0 && !adding ? (
+      {!open ? null : goals.length === 0 && !adding ? (
         <div className="card px-5 py-10 text-center text-sm text-muted">
           No goals yet. {canManage ? 'Add one so members know what to contribute and by when.' : 'An approver can add one.'}
         </div>

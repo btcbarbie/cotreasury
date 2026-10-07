@@ -9,6 +9,7 @@ import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
 import { AddMemberButton, TreasuryDetailsCard } from './SettingsPanels'
 import { OverviewPanel } from './OverviewPanel'
+import { CollapsibleSection, MinimizeButton } from './Collapsible'
 import { TreasurerPanel } from './TreasurerPanel'
 import { AttentionPanel, attentionItems } from './AttentionPanel'
 import { ActivityPanel, type ActivityEvent } from './ActivityPanel'
@@ -76,7 +77,7 @@ export function CollectiveTabs(props: {
     const onClick = (e: MouseEvent) => {
       const a = (e.target as Element | null)?.closest?.('a[href^="#"]')
       const target = a?.getAttribute('href')
-      const to: Record<string, Tab> = { '#requests': 'Activity log', '#activity': 'Activity log', '#ledger': 'Ledger' }
+      const to: Record<string, Tab> = { '#requests': 'Overview', '#activity': 'Activity log', '#ledger': 'Ledger' }
       if (target && to[target]) {
         e.preventDefault()
         setTab(to[target])
@@ -86,9 +87,14 @@ export function CollectiveTabs(props: {
     document.addEventListener('click', onClick)
     return () => document.removeEventListener('click', onClick)
   }, [])
+  // Live requests (waiting for votes, being paid, or failed) are worked on in
+  // Overview → Needs attention; everything else is history in the activity log.
+  const live = props.proposals.filter((p) => ['PENDING_APPROVAL', 'EXECUTING', 'FAILED'].includes(p.status))
+  const otherItems = attention.filter((i) => !/^[pef]-/.test(i.key)) // unclaimed / returned payouts
+  const needsCount = live.length + otherItems.length
   const counts: Partial<Record<Tab, number>> = {
-    Overview: attention.length || undefined,
-    'Activity log': props.proposals.filter((p) => p.status === 'PENDING_APPROVAL').length || undefined,
+    Overview: needsCount || undefined,
+    'Activity log': props.events.length || undefined,
     Ledger: props.entries.length,
     Settings: props.members.length,
   }
@@ -120,48 +126,44 @@ export function CollectiveTabs(props: {
               canManage={props.viewerRole === 'APPROVER' || props.viewerRole === 'ADMIN'}
               viewerId={props.viewerId}
             />
-            <section>
-              <h3 className="mb-3 font-semibold tracking-tight">
-                Needs attention{attention.length > 0 && <span className="tabular ml-2 text-sm font-normal text-muted">{attention.length}</span>}
-              </h3>
-              <AttentionPanel items={attention} onOpenRequests={() => setTab('Activity log')} />
-            </section>
+            <CollapsibleSection title="Needs attention" count={needsCount || undefined}>
+              <div className="grid gap-3">
+                {live.length === 0 && otherItems.length === 0 && <AttentionPanel items={[]} onOpenRequests={() => {}} />}
+                {live.map((p) => (
+                  <RequestCard
+                    key={p.id}
+                    p={p}
+                    currency={props.currency}
+                    viewerId={props.viewerId}
+                    viewerRole={props.viewerRole}
+                    approvers={props.members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN')}
+                  />
+                ))}
+                {otherItems.length > 0 && <AttentionPanel items={otherItems} onOpenRequests={() => {}} />}
+              </div>
+            </CollapsibleSection>
           </div>
         )}
         {tab === 'Activity log' && (
           <div className="grid gap-10">
-            <section>
-              <h3 className="mb-1 font-semibold tracking-tight">Requests</h3>
-              <p className="mb-3 text-sm text-muted">Anyone can ask to spend; approvers decide; the final approval pays through PayPal.</p>
-              <div className="mb-4">
-                <TreasurerPanel
-                  variant="assistant"
-                  collectiveId={props.collectiveId}
-                  kind={props.kind}
-                  currency={props.currency}
-                  brief={`Hi ${props.viewerName.split(' ')[0]}. Tell me what you need: I can **request a payout** for you (I'll ask who, how much and why) or **add funds** to the pool, including anything you still owe for a goal.`}
-                />
-              </div>
-              <RequestsPanel
-                proposals={props.proposals}
-                currency={props.currency}
-                viewerId={props.viewerId}
-                viewerRole={props.viewerRole}
-                members={props.members}
-              />
-            </section>
-            <section>
-              <h3 className="mb-3 font-semibold tracking-tight">
-                Every action<span className="tabular ml-2 text-sm font-normal text-muted">{props.events.length}</span>
-              </h3>
+            <TreasurerPanel
+              variant="assistant"
+              collectiveId={props.collectiveId}
+              kind={props.kind}
+              currency={props.currency}
+              brief={`Hi ${props.viewerName.split(' ')[0]}. Tell me what you need: I can **request a payout** for you (I'll ask who, how much and why) or **add funds** to the pool, including anything you still owe for a goal.`}
+            />
+            <CollapsibleSection title="Every action" count={props.events.length}>
               <ActivityPanel collectiveId={props.collectiveId} events={props.events} />
-            </section>
+            </CollapsibleSection>
           </div>
         )}
         {tab === 'Ledger' && (
-          <div className="card overflow-hidden">
-            <LedgerGrid entries={props.entries} currency={props.currency} />
-          </div>
+          <CollapsibleSection title="Ledger" count={props.entries.length}>
+            <div className="card overflow-hidden">
+              <LedgerGrid entries={props.entries} currency={props.currency} />
+            </div>
+          </CollapsibleSection>
         )}
         {tab === 'Settings' && (
           <div className="grid gap-10">
@@ -172,17 +174,14 @@ export function CollectiveTabs(props: {
               purpose={props.purpose}
               isAdmin={props.viewerRole === 'ADMIN'}
             />
-            <section>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-semibold tracking-tight">
-                  Members<span className="tabular ml-2 text-sm font-normal text-muted">{props.members.length}</span>
-                </h3>
-                {props.viewerRole === 'ADMIN' && <AddMemberButton collectiveId={props.collectiveId} />}
-              </div>
+            <CollapsibleSection
+              title="Members"
+              count={props.members.length}
+              actions={props.viewerRole === 'ADMIN' ? <AddMemberButton collectiveId={props.collectiveId} /> : undefined}
+            >
               <MembersPanel members={props.members} />
-            </section>
-            <section>
-              <h3 className="mb-3 font-semibold tracking-tight">Rules &amp; governance</h3>
+            </CollapsibleSection>
+            <CollapsibleSection title="Rules & governance">
               <RulesPanel
                 collectiveId={props.collectiveId}
                 tiers={props.tiers}
@@ -192,7 +191,7 @@ export function CollectiveTabs(props: {
                 viewerRole={props.viewerRole}
                 ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
               />
-            </section>
+            </CollapsibleSection>
           </div>
         )}
       </div>
@@ -215,30 +214,6 @@ const PROPOSAL_STATUS: Record<string, { label: string; pill: string }> = {
   COMPLETED: { label: 'Paid via PayPal', pill: 'pill-green' },
   REJECTED: { label: 'Rejected', pill: 'pill-red' },
   FAILED: { label: 'Failed', pill: 'pill-red' },
-}
-
-function RequestsPanel({
-  proposals,
-  currency,
-  viewerId,
-  viewerRole,
-  members,
-}: {
-  proposals: Proposal[]
-  currency: string
-  viewerId: string
-  viewerRole: string
-  members: Member[]
-}) {
-  const approvers = members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN')
-  return (
-    <div className="grid gap-3">
-      {proposals.length === 0 && <p className="px-1 text-sm text-faint">No spending requests yet.</p>}
-      {proposals.map((p) => (
-        <RequestCard key={p.id} p={p} currency={currency} viewerId={viewerId} viewerRole={viewerRole} approvers={approvers} />
-      ))}
-    </div>
-  )
 }
 
 function RequestCard({
@@ -319,10 +294,13 @@ function RequestCard({
   else if (open && isMaker) note = 'You created this request, so another approver has to review it.'
   else if (open && voted) note = 'You have signed off. Waiting for the other approvers.'
 
+  // Collapsed to one line unless it's your turn to vote or something went wrong.
+  const [expanded, setExpanded] = useState(canVote || p.status === 'FAILED')
+
   return (
     <div className="card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {isRule && (
               <span className="pill pill-violet">
@@ -332,7 +310,13 @@ function RequestCard({
             <span className="font-medium">{p.title}</span>
             <span className={`pill ${s.pill}`}>{s.label}</span>
           </div>
-          {p.description &&
+          {!expanded && (
+            <div className="mt-1 text-xs text-muted">
+              {approvals} of {p.requiredApprovals} approvals · requested by {p.proposedBy ?? 'unknown'}
+              {canVote && <span className="ml-1 font-medium text-amber">· your vote is needed</span>}
+            </div>
+          )}
+          {expanded && p.description &&
             (isRule ? (
               <ul className="mt-2 grid gap-1 text-sm text-ink/80">
                 {p.description.split('\n').map((l, i) => (
@@ -342,12 +326,20 @@ function RequestCard({
             ) : (
               <p className="mt-1 text-sm text-muted">{p.description}</p>
             ))}
-          <div className="mt-1 text-xs text-faint">
-            Requested by {p.proposedBy ?? 'unknown'} · {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </div>
+          {expanded && (
+            <div className="mt-1 text-xs text-faint">
+              Requested by {p.proposedBy ?? 'unknown'} · {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </div>
+          )}
         </div>
-        {!isRule && <div className="tabular text-xl font-semibold">{formatMoney(p.amountCents, currency)}</div>}
+        <div className="flex items-start gap-2">
+          {!isRule && <div className="tabular text-xl font-semibold">{formatMoney(p.amountCents, currency)}</div>}
+          <MinimizeButton open={expanded} onToggle={() => setExpanded(!expanded)} label="request" />
+        </div>
       </div>
+
+      {expanded && (
+        <>
 
       {p.flags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -444,6 +436,8 @@ function RequestCard({
       </div>
       {note && <div className="mt-3 text-xs text-muted">{note}</div>}
       {error && <div className="mt-3 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
+        </>
+      )}
     </div>
   )
 }
