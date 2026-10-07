@@ -49,6 +49,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@layer components {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
@@ -131,6 +132,14 @@ body {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+}
+
+paypal-button,
+venmo-button {
+  display: block;
+  width: 100%;
+  --paypal-button-border-radius: 10px;
 }
 
 .no-scrollbar {

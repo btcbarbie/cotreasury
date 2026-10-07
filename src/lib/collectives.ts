@@ -62,3 +62,11 @@ export async function getCollectiveView(id: string) {
 }
 
 export type CollectiveView = NonNullable<Awaited<ReturnType<typeof getCollectiveView>>>
+
+/** Resolve the acting member for API routes (same demo cookie as the page). */
+export async function getViewer(collectiveId: string) {
+  const jar = await cookies()
+  const viewerId = jar.get(viewerCookieName(collectiveId))?.value
+  const members = await prisma.member.findMany({ where: { collectiveId }, orderBy: { createdAt: 'asc' } })
+  return members.find((m) => m.id === viewerId) ?? members.find((m) => m.role === 'ADMIN') ?? members[0] ?? null
+}

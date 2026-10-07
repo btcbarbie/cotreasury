@@ -6,6 +6,7 @@ import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
 import { CollectiveTabs } from '@/components/CollectiveTabs'
+import { ContributeButton } from '@/components/ContributeDialog'
 
 export default function CollectivePage({ params }: PageProps<'/c/[id]'>) {
   return (
@@ -47,11 +48,20 @@ async function CollectiveContent({ params }: { params: Promise<{ id: string }> }
             <span className="text-muted truncate">{collective.paypalEmail}</span>
           </div>
         </div>
-        <ViewerSwitcher
-          collectiveId={collective.id}
-          viewerId={viewer.id}
-          members={collective.members.map((m) => ({ id: m.id, name: m.name, role: m.role }))}
-        />
+        <div className="flex flex-col gap-3 sm:items-end">
+          <ViewerSwitcher
+            collectiveId={collective.id}
+            viewerId={viewer.id}
+            members={collective.members.map((m) => ({ id: m.id, name: m.name, role: m.role }))}
+          />
+          <ContributeButton
+            collectiveId={collective.id}
+            collectiveName={collective.name}
+            currency={cur}
+            clientId={process.env.PAYPAL_CLIENT_ID ?? ''}
+            viewerName={viewer.name}
+          />
+        </div>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">

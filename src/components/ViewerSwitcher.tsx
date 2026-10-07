@@ -57,7 +57,7 @@ export function ViewerSwitcher({
       >
         <Avatar name={viewer.name} />
         <div className="min-w-0">
-          <div className="text-sm font-medium leading-tight">{viewer.name}</div>
+          <div className="whitespace-nowrap text-sm font-medium leading-tight">{viewer.name}</div>
           <div className="mt-0.5">
             <RoleBadge role={viewer.role} />
           </div>

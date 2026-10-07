@@ -1,6 +1,7 @@
 'use server'
 
 import { cookies } from 'next/headers'
+import { refresh } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { viewerCookieName } from '@/lib/collectives'
 
@@ -11,4 +12,9 @@ export async function switchViewer(collectiveId: string, memberId: string) {
   if (!member) throw new Error('Member not found')
   const jar = await cookies()
   jar.set(viewerCookieName(collectiveId), member.id, { path: '/', sameSite: 'lax', httpOnly: true })
+}
+
+/** Re-render the current collective page with fresh ledger data. */
+export async function refreshCollective() {
+  refresh()
 }
