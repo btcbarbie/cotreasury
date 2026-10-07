@@ -8,10 +8,12 @@ import {
   themeQuartz,
   type ColDef,
   type ICellRendererParams,
+  type GridApi,
+  type ProcessCellForExportParams,
   type IRowNode,
   type RowClassParams,
 } from 'ag-grid-community'
-import { AlertTriangle, Receipt as ReceiptIcon, Search } from 'lucide-react'
+import { AlertTriangle, Download, Receipt as ReceiptIcon, Search } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { Avatar } from './ui'
 import { ReceiptDialog } from './ReceiptDialog'
@@ -33,7 +35,62 @@ export type LedgerRow = {
   approvedBy: string[]
 }
 
-type Row = LedgerRow & { balanceCents: number | null }
+type Row = LedgerRow & { balanceCents: number | null; totals?: Totals }
+type Totals = { count: number; inCents: number; outCents: number }
+type GridContext = { currency: string }
+
+/** Pinned bottom row: totals of whatever the filters and search currently show (confirmed money only). */
+function TotalsCell(p: ICellRendererParams<Row, unknown, GridContext>) {
+  const { currency } = p.context
+  const totals = p.data?.totals ?? { count: 0, inCents: 0, outCents: 0 }
+  const col = p.column?.getColId()
+  if (col === 'entry')
+    return (
+      <div className="flex h-full flex-col justify-center leading-tight">
+        <span className="font-semibold">Totals</span>
+        <span className="text-xs text-muted">
+          {totals.count} entr{totals.count === 1 ? 'y' : 'ies'} shown · confirmed money only
+        </span>
+      </div>
+    )
+  if (col === 'status')
+    return (
+      <div className="flex h-full flex-col justify-center text-xs leading-tight text-muted">
+        <span>
+          Money in <span className="tabular font-semibold text-accent">{formatMoney(totals.inCents, currency)}</span>
+        </span>
+        <span>
+          Money out <span className="tabular font-semibold text-ink">{formatMoney(totals.outCents, currency)}</span>
+        </span>
+      </div>
+    )
+  if (col === 'amountCents') {
+    const net = totals.inCents - totals.outCents
+    return (
+      <div className="flex h-full flex-col items-end justify-center leading-tight">
+        <span className={`tabular font-semibold ${net >= 0 ? 'text-accent' : 'text-red'}`}>
+          {net >= 0 ? '+' : '−'}
+          {formatMoney(Math.abs(net), currency)}
+        </span>
+        <span className="text-[11px] text-muted">net</span>
+      </div>
+    )
+  }
+  return null
+}
+
+function sumFiltered(api: GridApi<Row>): Totals {
+  const t: Totals = { count: 0, inCents: 0, outCents: 0 }
+  api.forEachNodeAfterFilter((n) => {
+    const r = n.data
+    if (!r) return
+    t.count++
+    if (r.status !== 'CONFIRMED') return
+    if (r.direction === 'IN') t.inCents += r.amountCents
+    else t.outCents += r.amountCents
+  })
+  return t
+}
 type Filter = 'ALL' | 'IN' | 'OUT'
 
 const theme = themeQuartz.withParams({
@@ -109,6 +166,12 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
   const [filter, setFilter] = useState<Filter>('ALL')
   const [search, setSearch] = useState('')
   const [receiptFor, setReceiptFor] = useState<Row | null>(null)
+  const [totals, setTotals] = useState<Totals>({ count: 0, inCents: 0, outCents: 0 })
+  // Only update when the numbers change, so re-rendering the pinned row can't loop.
+  const recalc = (api: GridApi<Row>) => {
+    const t = sumFiltered(api)
+    setTotals((prev) => (prev.count === t.count && prev.inCents === t.inCents && prev.outCents === t.outCents ? prev : t))
+  }
 
   // Running balance over confirmed entries only, oldest → newest, then shown newest first.
   const rows = useMemo<Row[]>(() => {
@@ -220,6 +283,46 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
     [currency],
   )
 
+  // The pinned row carries the current totals; AG Grid re-renders it when they change.
+  const pinnedBottom = useMemo(() => [{ id: '__totals', totals } as Row], [totals])
+
+  function exportCsv() {
+    const stamp = new Date().toISOString().slice(0, 10)
+    gridRef.current?.api.exportDataAsCsv({
+      fileName: `ledger-${stamp}.csv`,
+      skipPinnedBottom: true,
+      processHeaderCallback: (p) => (p.column.getColId() === 'receipt' ? 'PAYPAL REFERENCE' : (p.column.getColDef().headerName ?? '')),
+      // Export plain values (ISO dates, signed amounts, PayPal ids) rather than what the cells draw.
+      processCellCallback: (p: ProcessCellForExportParams<Row>) => {
+        const r = p.node?.data
+        if (!r) return ''
+        switch (p.column.getColId()) {
+          case 'createdAt':
+            return r.createdAt.slice(0, 10)
+          case 'entry':
+            return `${payee(r.counterparty) ?? TYPE_LABEL[r.type]}: ${r.type === 'PAYOUT' ? `Paid out: ${r.memo ?? ''}` : (r.memo ?? TYPE_LABEL[r.type])}`
+          case 'status':
+            return [
+              r.type === 'UNAPPROVED_MOVEMENT' ? 'NOT APPROVED' : r.status,
+              r.type === 'PAYOUT' && r.requestedBy ? `requested by ${r.requestedBy}` : '',
+              r.type === 'PAYOUT' && r.approvedBy.length ? `approved by ${r.approvedBy.join(' & ')}` : '',
+              r.source === 'IMPORTED' ? 'imported record' : r.source === 'PAYPAL_WEBHOOK' ? 'confirmed by PayPal webhook' : 'confirmed by PayPal API',
+            ]
+              .filter(Boolean)
+              .join('; ')
+          case 'amountCents':
+            return ((r.direction === 'IN' ? 1 : -1) * r.amountCents / 100).toFixed(2)
+          case 'balanceCents':
+            return r.balanceCents == null ? '' : (r.balanceCents / 100).toFixed(2)
+          case 'receipt':
+            return r.paypalRef ?? ''
+          default:
+            return String(p.value ?? '')
+        }
+      },
+    })
+  }
+
   const counts = { ALL: rows.length, IN: rows.filter((r) => r.direction === 'IN').length, OUT: rows.filter((r) => r.direction === 'OUT').length }
 
   return (
@@ -239,18 +342,32 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
             <span className="tabular ml-1.5 text-xs opacity-60">{counts[f]}</span>
           </button>
         ))}
-        <div className="relative ml-auto w-full sm:w-72">
+        <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
+        <div className="relative w-full sm:w-72">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
           <input className="input !h-8 rounded-full pl-8" placeholder="Search a name or purpose" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <button className="btn btn-ghost !h-8 shrink-0 rounded-full !px-3 text-sm" onClick={exportCsv} title="Download what's shown as a CSV file">
+          <Download size={14} /> Export CSV
+        </button>
         </div>
       </div>
       <div className="h-[560px] w-full">
         <AgGridReact<Row>
           ref={gridRef}
+          context={{ currency } satisfies GridContext}
+          pinnedBottomRowData={pinnedBottom}
+          onGridReady={(e) => recalc(e.api)}
+          onModelUpdated={(e) => recalc(e.api)}
           theme={theme}
           rowData={rows}
           columnDefs={columnDefs}
-          defaultColDef={{ sortable: true, resizable: true, suppressMovable: true }}
+          defaultColDef={{
+            sortable: true,
+            resizable: true,
+            suppressMovable: true,
+            cellRendererSelector: (p) => (p.node.rowPinned ? { component: TotalsCell } : undefined),
+          }}
           getRowId={(p) => p.data.id}
           quickFilterText={search}
           isExternalFilterPresent={() => filter !== 'ALL'}
