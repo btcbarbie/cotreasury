@@ -195,6 +195,19 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Closing call to action */}
+      <section className="pb-16 sm:pb-20">
+        <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-r from-accent via-teal to-violet px-6 py-12 text-center text-white sm:py-14">
+          <div className="pointer-events-none absolute -top-16 -left-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -right-10 -bottom-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-4xl">Start your group&apos;s treasury</h2>
+          <p className="mx-auto mt-3 max-w-xl text-white/85 sm:text-lg">It takes a minute to set up. Invite your members with a link.</p>
+          <Link href="/new" className="btn mt-7 inline-flex !h-11 !px-5 bg-white !text-ink hover:bg-white/90">
+            Create a Treasury <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
     </div>
   )
 }
