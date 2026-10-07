@@ -209,3 +209,27 @@ export function createPayoutBatch(opts: {
 export function getPayoutBatch(batchId: string) {
   return paypal<PayoutBatch>(`/v1/payments/payouts/${batchId}?fields=items&page_size=100`)
 }
+
+export type PayoutItemDetail = PayoutItem & {
+  payout_item_fee?: { value: string; currency: string }
+  time_processed?: string
+}
+
+export function getPayoutItem(itemId: string) {
+  return paypal<PayoutItemDetail>(`/v1/payments/payouts-item/${itemId}`)
+}
+
+export type CaptureDetail = PayPalCapture & {
+  create_time?: string
+  update_time?: string
+  seller_receivable_breakdown?: {
+    gross_amount?: { value: string; currency_code: string }
+    paypal_fee?: { value: string; currency_code: string }
+    net_amount?: { value: string; currency_code: string }
+  }
+  supplementary_data?: { related_ids?: { order_id?: string } }
+}
+
+export function getCaptureDetail(captureId: string) {
+  return paypal<CaptureDetail>(`/v2/payments/captures/${captureId}`)
+}

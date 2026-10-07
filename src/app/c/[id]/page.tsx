@@ -149,18 +149,23 @@ async function CollectiveContent({
         viewerRole={viewer.role}
         members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role }))}
         tiers={collective.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals }))}
-        entries={collective.entries.map((e) => ({
-          id: e.id,
-          createdAt: e.createdAt.toISOString(),
-          type: e.type,
-          direction: e.direction,
-          amountCents: e.amountCents,
-          status: e.status,
-          source: e.source,
-          memo: e.memo,
-          counterparty: e.counterparty ?? e.member?.name ?? null,
-          paypalRef: e.paypalRef,
-        }))}
+        entries={collective.entries.map((e) => {
+          const goal = e.goalId ? collective.goals.find((g) => g.id === e.goalId) : null
+          return {
+            id: e.id,
+            createdAt: e.createdAt.toISOString(),
+            type: e.type,
+            direction: e.direction,
+            amountCents: e.amountCents,
+            status: e.status,
+            source: e.source,
+            memo: goal ? `Paid for ${goal.title}` : e.memo,
+            counterparty: e.counterparty ?? e.member?.name ?? null,
+            paypalRef: e.paypalRef,
+            requestedBy: e.proposal?.proposedBy?.name ?? null,
+            approvedBy: e.proposal?.approvals.map((a) => a.member.name) ?? [],
+          }
+        })}
         newPayeeRule={collective.newPayeeRule}
         goals={goalProgress(collective.goals, collective.members, collective.entries)}
         events={collective.events.map((e) => ({ id: e.id, seq: e.seq, actor: e.actor, action: e.action, summary: e.summary, createdAt: e.createdAt.toISOString(), hash: e.hash }))}

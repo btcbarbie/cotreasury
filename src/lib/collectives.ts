@@ -47,7 +47,19 @@ export async function getCollectiveView(id: string) {
       tiers: { orderBy: { minCents: 'asc' } },
       goals: { orderBy: { createdAt: 'asc' } },
       events: { orderBy: { seq: 'desc' }, take: 100 },
-      entries: { orderBy: { createdAt: 'desc' }, include: { member: { select: { name: true } } } },
+      entries: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          member: { select: { name: true } },
+          proposal: {
+            select: {
+              title: true,
+              proposedBy: { select: { name: true } },
+              approvals: { where: { decision: 'APPROVE' }, orderBy: { createdAt: 'asc' }, select: { member: { select: { name: true } } } },
+            },
+          },
+        },
+      },
       proposals: {
         orderBy: { createdAt: 'desc' },
         include: {
