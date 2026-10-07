@@ -108,7 +108,7 @@ async function CollectiveContent({
               </span>
               {s.label}
             </div>
-            <div className={`tabular mt-2 font-semibold tracking-tight ${s.primary ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'} ${s.valueTone ?? ''}`}>
+            <div className={`tabular mt-2 font-semibold tracking-tight text-xl sm:text-2xl ${s.valueTone ?? ''}`}>
               {s.sign && s.sign !== '=' && <span className="mr-0.5 text-faint">{s.sign}</span>}
               {formatMoney(s.value, cur)}
             </div>
