@@ -46,7 +46,7 @@ const PRINCIPLES = [
     title: 'AI Treasurer',
     tagline: 'The impartial referee.',
     body: [
-      'The AI checks transactions and treasury activity against the rules, helps people understand the ledger, flags inconsistencies, and answers questions about what happened.',
+      'The AI checks transactions and treasury activity against the rules, helps people understand the ledger, points out anything that breaks the rules, and answers questions about what happened.',
       'It cannot approve requests, move money, or rewrite the ledger.',
     ],
     Icon: Sparkles,
@@ -63,7 +63,7 @@ const PRINCIPLES = [
     title: 'Collective Rules',
     tagline: 'Decisions are made by the people authorized to make them.',
     body: [
-      'Your group decides who can approve payments and how many approvals are required. The AI applies those rules consistently — it doesn’t get to change them.',
+      'Your group decides who can approve payments and how many approvals are required. CoTreasury applies those rules consistently, and the AI can’t change them.',
     ],
     Icon: Scale,
   },
