@@ -7,6 +7,7 @@ import { decideRequest, refreshCollective, retryRequestPayout } from '@/app/c/[i
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
+import { NewRequestForm } from './NewRequestForm'
 import type { LedgerRow } from './LedgerGrid'
 
 // AG Grid touches window on import; render it client-side only.
@@ -83,7 +84,14 @@ export function CollectiveTabs(props: {
 
       <div className="mt-5">
         {tab === 'Requests' && (
-          <RequestsPanel proposals={props.proposals} currency={props.currency} viewerId={props.viewerId} viewerRole={props.viewerRole} members={props.members} />
+          <RequestsPanel
+            collectiveId={props.collectiveId}
+            proposals={props.proposals}
+            currency={props.currency}
+            viewerId={props.viewerId}
+            viewerRole={props.viewerRole}
+            members={props.members}
+          />
         )}
         {tab === 'Ledger' && (
           <div className="card overflow-hidden">
@@ -125,35 +133,45 @@ const PROPOSAL_STATUS: Record<string, { label: string; pill: string }> = {
 }
 
 function RequestsPanel({
+  collectiveId,
   proposals,
   currency,
   viewerId,
   viewerRole,
   members,
 }: {
+  collectiveId: string
   proposals: Proposal[]
   currency: string
   viewerId: string
   viewerRole: string
   members: Member[]
 }) {
-  if (proposals.length === 0) {
-    return (
-      <div className="card flex flex-col items-center px-6 py-14 text-center">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-soft text-violet">
-          <Sparkles size={18} />
-        </span>
-        <div className="mt-4 font-medium">No spending requests yet</div>
-        <p className="mt-1 max-w-sm text-sm text-muted">
-          Ask the AI Treasurer whether the group can afford something. It checks the ledger, works out how many
-          approvals the rules require, and drafts the request for the approvers.
-        </p>
-      </div>
-    )
-  }
+  const [composing, setComposing] = useState(false)
   const approvers = members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN')
   return (
     <div className="grid gap-3">
+      {composing ? (
+        <NewRequestForm collectiveId={collectiveId} currency={currency} onClose={() => setComposing(false)} />
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted">Anyone can ask to spend; approvers decide; the final approval pays through PayPal.</p>
+          <button className="btn btn-primary !h-9" onClick={() => setComposing(true)}>
+            <Send size={14} /> Request a payment
+          </button>
+        </div>
+      )}
+      {proposals.length === 0 && !composing && (
+        <div className="card flex flex-col items-center px-6 py-14 text-center">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-soft text-violet">
+            <Sparkles size={18} />
+          </span>
+          <div className="mt-4 font-medium">No spending requests yet</div>
+          <p className="mt-1 max-w-sm text-sm text-muted">
+            Request a payment above, or ask the AI Treasurer whether the group can afford something and it will draft the request for you.
+          </p>
+        </div>
+      )}
       {proposals.map((p) => (
         <RequestCard key={p.id} p={p} currency={currency} viewerId={viewerId} viewerRole={viewerRole} approvers={approvers} />
       ))}

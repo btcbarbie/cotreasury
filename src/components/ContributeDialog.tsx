@@ -247,6 +247,11 @@ function ContributeDialog({
               <ShieldCheck size={14} className="mt-px shrink-0 text-accent" />
               Paid straight into the group&apos;s own PayPal account. It appears in the ledger once PayPal confirms it.
             </p>
+            <div className="mt-3 rounded-[10px] border border-dashed border-line-strong px-3 py-2.5 text-xs leading-relaxed text-muted">
+              <span className="font-medium text-ink">Sandbox mode.</span> In PayPal&apos;s window choose{' '}
+              <span className="font-medium text-ink">Log in</span> and use a PayPal <span className="font-medium text-ink">sandbox personal</span> test account
+              (developer.paypal.com → Testing Tools → Sandbox Accounts). Your real PayPal login and the card form won&apos;t work here, and no real money moves.
+            </div>
           </>
         )}
 
