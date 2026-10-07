@@ -118,6 +118,21 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Live demo treasuries */}
+      <section id="treasuries" className="scroll-mt-20 border-t border-line py-14 sm:py-16">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Try a demo treasury</h2>
+            <p className="mt-2 text-muted">Made-up treasuries with months of history, running on PayPal&apos;s sandbox. Open one as its admin, or view it as any member.</p>
+          </div>
+        </div>
+        <div className="mt-8">
+          <Suspense fallback={<CollectiveGridSkeleton />}>
+            <DemoGrid />
+          </Suspense>
+        </div>
+      </section>
+
       {/* Principles */}
       <section className="border-t border-line py-14 sm:py-16">
         <div className="flex items-center gap-2 text-sm font-medium text-accent">
@@ -136,21 +151,6 @@ export default function Home() {
               </div>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* Live demo treasuries */}
-      <section id="treasuries" className="scroll-mt-20 border-t border-line py-14 sm:py-16">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Try a demo treasury</h2>
-            <p className="mt-2 text-muted">Made-up treasuries with months of history, running on PayPal&apos;s sandbox. Open one as its admin, or view it as any member.</p>
-          </div>
-        </div>
-        <div className="mt-8">
-          <Suspense fallback={<CollectiveGridSkeleton />}>
-            <DemoGrid />
-          </Suspense>
         </div>
       </section>
     </div>
