@@ -51,7 +51,7 @@ function Rich({ text }: { text: string }) {
 }
 
 // Things people come to the AI for: a question about the money, a payout, paying what they owe.
-const ACTION_SUGGESTIONS = ['I want to request a payout', 'I want to pay what I owe']
+const ACTION_SUGGESTIONS = ['I want to request a payout', 'I want to add funds']
 
 /**
  * The one AI chat, opened from the floating Ask button: answers questions about

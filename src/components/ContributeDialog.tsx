@@ -291,7 +291,7 @@ function ContributeDialog({
               className="mt-3 text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
               onClick={() => {
                 onClose()
-                openAsk('I want to pay what I owe')
+                openAsk('I want to add funds')
               }}
             >
               Not sure what to pay? Ask the AI Treasurer
