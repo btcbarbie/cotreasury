@@ -119,9 +119,7 @@ export function ReceiptDialog({
             </p>
           </>
         )}
-        {/* Kept apart from PayPal's data: this part is CoTreasury's, not PayPal's. */}
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-line pt-3 text-xs text-muted">
-          <span>CoTreasury · not part of PayPal&apos;s record</span>
+        <div className="mt-5 flex justify-end border-t border-line pt-3 text-xs text-muted">
           <button
             type="button"
             className="inline-flex items-center gap-1.5 underline-offset-2 hover:text-ink hover:underline"

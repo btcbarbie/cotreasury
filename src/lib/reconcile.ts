@@ -107,7 +107,7 @@ export async function reconcile(collectiveId: string, { force = false } = {}): P
     await recordEvent(c.id, {
       actor: 'CoTreasury',
       action: 'UNAPPROVED_MOVEMENT',
-      summary: `found ${formatMoney(cents, c.currency, { cents: true })} ${incoming ? 'coming into' : 'leaving'} the group's PayPal account that wasn't made through CoTreasury (${label.toLowerCase()}${who ? `, ${who}` : ''}). Nobody approved it here`,
+      summary: `found ${formatMoney(cents, c.currency, { cents: true })} ${incoming ? 'coming into' : 'leaving'} the group's PayPal account that wasn't made through CoTreasury (${label.charAt(0).toLowerCase() + label.slice(1)}${who ? `, ${who}` : ''}). Nobody approved it here`,
       data: { entryId: entry.id, transactionId: t.transaction_id, eventCode: t.transaction_event_code, amountCents: cents },
     })
   }

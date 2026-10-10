@@ -394,7 +394,9 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
                   status: receiptFor.status === 'CONFIRMED' ? 'Confirmed' : receiptFor.status === 'PENDING' ? 'Pending' : 'Failed',
                   note:
                     receiptFor.type === 'UNAPPROVED_MOVEMENT'
-                      ? `Found in PayPal’s own history of the group’s account (transaction ${receiptFor.paypalRef}). It wasn’t made through CoTreasury, so nobody requested or approved it here.`
+                      ? receiptFor.paypalRef
+                        ? `Found in PayPal’s own history of the group’s account (transaction ${receiptFor.paypalRef}). It wasn’t made through CoTreasury, so nobody requested or approved it here.`
+                        : 'Money that moved in the group’s PayPal account outside CoTreasury, so nobody requested or approved it here. It still counts in the balance: the money really left.'
                       : undefined,
                 }
           }

@@ -39,6 +39,8 @@ type DemoSeed = {
     openingDaysAgo: number
     contributions: { member: string; cents: number; daysAgo: number; memo?: string; goal?: string }[]
     payouts: { title: string; to: string; cents: number; daysAgo: number }[]
+    /** Money moved directly in PayPal, outside CoTreasury: shows up red, with an alert to everyone. */
+    outside: { what: string; to: string; cents: number; daysAgo: number }[]
     goals: { title: string; kind: 'TARGET' | 'MONTHLY'; perMemberCents: number; dueInDays?: number; startedDaysAgo?: number }[]
 }
 
@@ -134,8 +136,51 @@ async function createCollective(prisma: PrismaClient, data: DemoSeed) {
     })
   }
 
+  for (const o of data.outside) await createOutsideMovement(prisma, collective.id, o)
+
   await writeDemoHistory(prisma, collective.id)
   return collective
+}
+
+/** One example of money leaving the group's PayPal account outside CoTreasury. */
+async function createOutsideMovement(prisma: PrismaClient, collectiveId: string, o: { what: string; to: string; cents: number; daysAgo: number }) {
+  return prisma.ledgerEntry.create({
+    data: {
+      collectiveId,
+      type: 'UNAPPROVED_MOVEMENT',
+      direction: 'OUT',
+      amountCents: o.cents,
+      status: 'CONFIRMED', // the money really left; the balance reflects it
+      source: 'IMPORTED',
+      memo: `${o.what}, outside CoTreasury`,
+      counterparty: o.to,
+      createdAt: daysAgo(o.daysAgo),
+      confirmedAt: daysAgo(o.daysAgo),
+    },
+  })
+}
+
+/** The same sealed alert the live outside-activity check writes (members get it as a notification). */
+function outsideMovementEvent(e: { id: string; amountCents: number; memo: string | null; counterparty: string | null; createdAt: Date }, currency: string) {
+  const what = (e.memo ?? 'Payment sent from PayPal').replace(/, outside CoTreasury$/, '')
+  return {
+    actor: 'CoTreasury',
+    action: 'UNAPPROVED_MOVEMENT',
+    summary: `found ${formatMoney(e.amountCents, currency, { cents: true })} leaving the group's PayPal account that wasn't made through CoTreasury (${what.charAt(0).toLowerCase() + what.slice(1)}${e.counterparty ? `, ${e.counterparty}` : ''}). Nobody approved it here`,
+    data: { entryId: e.id, amountCents: e.amountCents },
+    at: e.createdAt,
+  }
+}
+
+/** Demos created before these examples existed get their story's examples once, each with its member alert. */
+async function backfillOutsideMovements(prisma: PrismaClient, seed: DemoSeed) {
+  const c = await prisma.collective.findFirst({ where: { isDemo: true, name: seed.name }, select: { id: true, currency: true } })
+  if (!c) return
+  if (await prisma.ledgerEntry.count({ where: { collectiveId: c.id, type: 'UNAPPROVED_MOVEMENT' } })) return
+  for (const o of seed.outside) {
+    const e = await createOutsideMovement(prisma, c.id, o)
+    await recordEvent(c.id, outsideMovementEvent(e, c.currency))
+  }
 }
 
 /**
@@ -162,6 +207,10 @@ export async function writeDemoHistory(prisma: PrismaClient, collectiveId: strin
   }
   for (const e of c.entries) {
     const amount = formatMoney(e.amountCents, c.currency, { cents: true })
+    if (e.type === 'UNAPPROVED_MOVEMENT') {
+      await recordEvent(c.id, outsideMovementEvent(e, c.currency))
+      continue
+    }
     const summary =
       e.type === 'OPENING_BALANCE'
         ? `imported an opening balance of ${amount} from the previous treasurer's records`
@@ -225,6 +274,7 @@ const DEMO_SEEDS: DemoSeed[] = [
       { member: 'Chris Adeyemi', cents: 10_000, daysAgo: 6, goal: 'Books & laptop' },
     ],
     payouts: [{ title: 'Enrollment deposit', to: 'Howard University', cents: 50_000, daysAgo: 30 }],
+    outside: [{ what: 'Withdrawal to a bank account', to: 'Bank account ending 4417', cents: 30_000, daysAgo: 16 }],
   },
   {
     name: DEMO_NAMES[1],
@@ -272,6 +322,10 @@ const DEMO_SEEDS: DemoSeed[] = [
       { title: 'Apartment deposit: Alfama, 6 nights', to: 'Alfama apartment host', cents: 140_000, daysAgo: 40 },
       { title: 'Fado night reservation', to: 'Fado house in Alfama', cents: 24_000, daysAgo: 10 },
     ],
+    outside: [
+      { what: 'Payment sent from PayPal', to: 'Lisboa Car Rentals', cents: 25_000, daysAgo: 12 },
+      { what: 'Payment sent from PayPal', to: 'Chloe Bennett', cents: 6_000, daysAgo: 4 },
+    ],
   },
   {
     name: DEMO_NAMES[2],
@@ -312,6 +366,7 @@ const DEMO_SEEDS: DemoSeed[] = [
       { title: 'Car insurance (6 months)', to: 'Car insurer', cents: 59_000, daysAgo: 40 },
       { title: 'Rent', to: 'Parkside Apartments', cents: 210_000, daysAgo: 28 },
     ],
+    outside: [{ what: 'Payment sent from PayPal', to: 'BestTech Online', cents: 18_000, daysAgo: 20 }],
   },
 ]
 
@@ -331,6 +386,7 @@ export async function ensureDemoCollectives(prisma: PrismaClient) {
     await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, maxMembers: 50 }, data: { maxMembers: seed.maxMembers } })
     await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, paypalAccount: null }, data: { paypalAccount: seed.paypalAccount } })
   }
+  for (const seed of DEMO_SEEDS) await backfillOutsideMovements(prisma, seed)
   const created: string[] = []
   for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.name))) {
     await createCollective(prisma, seed)

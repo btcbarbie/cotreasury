@@ -26,7 +26,7 @@ const LOOK: Record<string, { Icon: typeof Bell; tone: string }> = {
   TREASURY_CLOSING: { Icon: Archive, tone: 'bg-red-soft text-red' },
   TREASURY_CLOSED: { Icon: Archive, tone: 'bg-bg text-muted' },
   TREASURY_REOPENED: { Icon: Archive, tone: 'bg-accent-soft text-accent' },
-  UNAPPROVED_MOVEMENT: { Icon: AlertTriangle, tone: 'bg-red-soft text-red' },
+  UNAPPROVED_MOVEMENT: { Icon: AlertTriangle, tone: 'bg-amber-soft text-amber' },
 }
 
 const SHOW = 6
