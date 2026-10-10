@@ -369,9 +369,6 @@ export function CreateTreasuryWizard() {
                 </div>
               ))}
             </div>
-            <p className="mt-4 rounded-xl border border-dashed border-line-strong px-3 py-2.5 text-xs leading-relaxed text-muted">
-              <span className="font-medium text-ink">Sandbox demo:</span> money moves through PayPal&apos;s sandbox using CoTreasury&apos;s test business account, so no real funds are involved. In production each treasury connects its own account through PayPal&apos;s partner onboarding.
-            </p>
           </section>
         )}
 
