@@ -23,6 +23,20 @@ function readable(e: ActivityEvent) {
     const m = text.match(/^paid out (\$[\d,.]+) to (.+?): (.+)$/)
     if (m) return `paid ${m[1]} from the treasury to ${m[2]} for ${m[3]}`
   }
+  if (e.action === 'UNAPPROVED_MOVEMENT') {
+    const m = text.match(/^found (\$[\d,.]+) (leaving|coming into) the group's PayPal account that wasn't made through CoTreasury(?: \((.+)\))?/)
+    if (m) {
+      const [, amount, way, detail = ''] = m
+      const [what, ...rest] = detail.split(', ')
+      const who = rest.join(', ')
+      const bank = who ? who.replace(/^Bank account/, 'a bank account') : 'a bank account'
+      if (/withdrawal/i.test(what)) return `${amount} was withdrawn to ${bank} outside CoTreasury. Nobody approved it.`
+      if (/deposit/i.test(what)) return `${amount} was deposited from ${bank} outside CoTreasury.`
+      return way === 'leaving'
+        ? `${amount} left the PayPal account outside CoTreasury${who ? `, sent to ${who}` : ''}. Nobody approved it.`
+        : `${amount} came into the PayPal account outside CoTreasury${who ? ` from ${who}` : ''}.`
+    }
+  }
   if (e.action === 'OPENING_BALANCE_IMPORTED') {
     const m = text.match(/opening balance of (\$[\d,.]+)/)
     if (m) return `carried over an opening balance of ${m[1]}`
@@ -83,7 +97,9 @@ export function ActivityPanel({ collectiveId, events }: { collectiveId: string; 
             <ActorMark actor={e.actor} />
             <div className="min-w-0 flex-1">
               <div className="text-sm">
-                <span className="font-medium">{e.actor}</span> {readable(e)}
+                {/* Outside movements read as a standalone sentence, without the "CoTreasury" actor in front. */}
+                {e.action !== 'UNAPPROVED_MOVEMENT' && <span className="font-medium">{e.actor} </span>}
+                {readable(e)}
               </div>
               <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-faint">
                 <span>
