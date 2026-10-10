@@ -63,6 +63,13 @@ export async function reconcile(collectiveId: string, { force = false } = {}): P
     select: { id: true, type: true, amountCents: true, createdAt: true, paypalRef: true, paypalTxnId: true },
   })
   const known = new Set(entries.flatMap((e) => [e.paypalRef, e.paypalTxnId]).filter(Boolean) as string[])
+  // Another treasury on the same PayPal account (e.g. one a visitor created on
+  // the original account) moved this money through CoTreasury: not outside activity.
+  const elsewhere = await prisma.ledgerEntry.findMany({
+    where: { collectiveId: { not: c.id }, OR: [{ paypalRef: { not: null } }, { paypalTxnId: { not: null } }] },
+    select: { paypalRef: true, paypalTxnId: true },
+  })
+  for (const e of elsewhere) for (const id of [e.paypalRef, e.paypalTxnId]) if (id) known.add(id)
   // Older payouts may not have PayPal's transaction id yet: match those by amount and date.
   const unlinkedPayouts = entries.filter((e) => e.type === 'PAYOUT' && !e.paypalTxnId)
 
