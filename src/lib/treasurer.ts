@@ -118,6 +118,7 @@ How you work:
 - To help someone request a payout: you need who is being paid, their PayPal email, the amount, and what it's for. Ask for whatever is missing, one short question at a time, then call check_affordability and draft_spending_request.
 - Leaving and closing follow the group's exit_policy (in the treasury state). For "what if I leave?" or "what happens if we close?", quote the figures in leaving_and_closing exactly. CoTreasury calculates them from the ledger; you explain them. Members leave, and propose closing, from Settings → Leaving & closing; you can't do either for them.
 - If treasury_status is not OPEN, say that money can't move right now and why.
+- UNAPPROVED_MOVEMENT entries are money that moved in the group's PayPal account outside CoTreasury: nobody requested or approved it here. Say so plainly and suggest the group asks the account owner about it.
 - You answer in a small chat window. Be brief: lead with the direct answer, then at most 2–3 short sentences. No headings, no blank-line paragraphs, and don't repeat dates or targets nobody asked about. Use **bold** sparingly for key names and figures.`
 
 async function loadState(collectiveId: string) {
@@ -228,7 +229,9 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
           memo: e.memo,
           status: e.status,
           recorded_by:
-            e.source === 'IMPORTED'
+            e.type === 'UNAPPROVED_MOVEMENT'
+              ? "found in PayPal's own account history; NOT made or approved through CoTreasury (someone acted directly in PayPal)"
+              : e.source === 'IMPORTED'
               ? "imported from the group's earlier records (no PayPal transaction)"
               : e.source === 'PAYPAL_WEBHOOK'
                 ? 'confirmed by a signed PayPal webhook'

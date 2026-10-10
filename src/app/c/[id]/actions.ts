@@ -14,6 +14,7 @@ import { closeRejected, votersLeft } from '@/lib/voting'
 import { recordEvent } from '@/lib/audit'
 import { admitMember } from '@/lib/members'
 import { markClosed, openPayoutCount, treasuryLock } from '@/lib/exit'
+import { reconcile } from '@/lib/reconcile'
 import { fairShares, type ExitPolicy } from '@/lib/exitPolicy'
 import { normalizeReceiver, type ReceiverType } from '@/lib/recipients'
 import { formatMoney } from '@/lib/money'
@@ -446,6 +447,19 @@ export async function cancelClose(proposalId: string): Promise<Result> {
   })
   refresh()
   return { ok: true }
+}
+
+/** Check the group's PayPal history against the ledger right now. */
+export async function checkPayPalNow(collectiveId: string): Promise<{ ok: true; flagged: number } | { ok: false; error: string }> {
+  if (!(await getViewer(collectiveId))) return { ok: false, error: 'Not a member of this collective.' }
+  try {
+    const r = await reconcile(collectiveId, { force: true })
+    if (!r.checked) return { ok: false, error: r.reason === 'shared account' ? 'This group uses the shared demo account, which mixes several groups, so it can’t be checked.' : 'Try again in a moment.' }
+    refresh()
+    return { ok: true, flagged: r.flagged }
+  } catch {
+    return { ok: false, error: 'PayPal’s transaction history isn’t reachable right now.' }
+  }
 }
 
 /** Approvers set what the collective is saving for. Goals don't move money, so no vote is needed. */

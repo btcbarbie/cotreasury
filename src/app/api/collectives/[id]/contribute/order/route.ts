@@ -28,7 +28,7 @@ export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id
       currency: collective.currency,
       customId: contributionCustomId(collective.id, viewer.id, goal?.id),
       description: goal ? `${goal.title}: ${collective.name}` : `Contribution to ${collective.name}`,
-    })
+    }, collective.paypalAccount)
     return NextResponse.json({ orderId: order.id })
   } catch (e) {
     const debugId = e instanceof PayPalError ? e.debugId : undefined

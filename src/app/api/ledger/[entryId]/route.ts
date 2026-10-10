@@ -10,8 +10,9 @@ const WEBHOOK_GRACE_MS = 15_000
 
 export async function GET(_req: Request, ctx: RouteContext<'/api/ledger/[entryId]'>) {
   const { entryId } = await ctx.params
-  let entry = await prisma.ledgerEntry.findUnique({ where: { id: entryId } })
-  if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const found = await prisma.ledgerEntry.findUnique({ where: { id: entryId }, include: { collective: { select: { paypalAccount: true } } } })
+  if (!found) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  let entry = found
 
   if (
     entry.status === 'PENDING' &&
@@ -19,8 +20,8 @@ export async function GET(_req: Request, ctx: RouteContext<'/api/ledger/[entryId
     entry.paypalRef &&
     Date.now() - entry.createdAt.getTime() > WEBHOOK_GRACE_MS
   ) {
-    const capture = await getCapture(entry.paypalRef)
-    entry = (await applyCaptureStatus(capture, 'PAYPAL_API')) ?? entry
+    const capture = await getCapture(entry.paypalRef, found.collective.paypalAccount)
+    entry = { ...found, ...((await applyCaptureStatus(capture, 'PAYPAL_API')) ?? {}) }
   }
   return NextResponse.json({ status: entry.status, source: entry.source })
 }

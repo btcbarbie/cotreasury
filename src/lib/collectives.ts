@@ -3,6 +3,7 @@ import { prisma } from './prisma'
 import { computeTreasury } from './treasury'
 import { refreshPanels } from './panel'
 import { closeStaleRequests } from './voting'
+import { reconcileInBackground } from './reconcile'
 
 export function viewerCookieName(collectiveId: string) {
   return `tp_viewer_${collectiveId}`
@@ -47,6 +48,8 @@ export async function getCollectiveView(id: string) {
   // and close requests that couldn't pass once the remaining voters had theirs.
   await refreshPanels(id)
   await closeStaleRequests(id)
+  // Compare the group's PayPal history with the ledger (throttled, never blocks the page).
+  reconcileInBackground(id)
   const collective = await prisma.collective.findUnique({
     where: { id },
     include: {

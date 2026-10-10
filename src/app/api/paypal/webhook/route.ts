@@ -20,10 +20,12 @@ export async function POST(req: Request) {
   const seen = await prisma.webhookEvent.findUnique({ where: { id: event.id } })
   if (seen?.processedAt) return NextResponse.json({ ok: true, duplicate: true })
 
-  const verified = await verifyWebhookSignature(req.headers, raw).catch((e) => {
+  // Which group's PayPal account sent it (null = the shared account), or false if none.
+  const from = await verifyWebhookSignature(req.headers, raw).catch((e) => {
     console.error('Webhook verification error', e)
-    return false
+    return false as const
   })
+  const verified = from !== false
   await prisma.webhookEvent.upsert({
     where: { id: event.id },
     create: { id: event.id, eventType: event.event_type, verified, payload: raw },

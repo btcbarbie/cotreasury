@@ -383,7 +383,7 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
           entryId={receiptFor.id}
           title={payee(receiptFor.counterparty) ?? TYPE_LABEL[receiptFor.type]}
           recorded={
-            receiptFor.paypalRef && receiptFor.source !== 'IMPORTED'
+            receiptFor.paypalRef && receiptFor.source !== 'IMPORTED' && receiptFor.type !== 'UNAPPROVED_MOVEMENT'
               ? undefined
               : {
                   kind: TYPE_LABEL[receiptFor.type] ?? receiptFor.type,
@@ -392,6 +392,10 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
                   counterparty: receiptFor.counterparty,
                   memo: receiptFor.memo,
                   status: receiptFor.status === 'CONFIRMED' ? 'Confirmed' : receiptFor.status === 'PENDING' ? 'Pending' : 'Failed',
+                  note:
+                    receiptFor.type === 'UNAPPROVED_MOVEMENT'
+                      ? `Found in PayPal’s own history of the group’s account (transaction ${receiptFor.paypalRef}). It wasn’t made through CoTreasury, so nobody requested or approved it here.`
+                      : undefined,
                 }
           }
           askPrompt={`Explain this ledger entry: the ${(TYPE_LABEL[receiptFor.type] ?? receiptFor.type).toLowerCase()} of ${formatMoney(receiptFor.amountCents, currency, { cents: true })}${

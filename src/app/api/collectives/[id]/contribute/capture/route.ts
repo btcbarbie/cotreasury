@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getViewer } from '@/lib/collectives'
+import { prisma } from '@/lib/prisma'
 import { captureOrder, PayPalError } from '@/lib/paypal'
 import { contributionCustomId, recordCaptureAttempt } from '@/lib/ledger'
 
@@ -10,7 +11,8 @@ export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id
   if (!viewer || typeof orderId !== 'string') return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
   try {
-    const order = await captureOrder(orderId)
+    const c = await prisma.collective.findUnique({ where: { id }, select: { paypalAccount: true } })
+    const order = await captureOrder(orderId, c?.paypalAccount)
     const unit = order.purchase_units[0]
     const capture = unit?.payments?.captures?.[0]
     if (!capture) return NextResponse.json({ error: 'PayPal returned no capture.' }, { status: 502 })

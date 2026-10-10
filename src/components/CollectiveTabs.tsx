@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { AlertTriangle, BookOpen, Check, History, LayoutGrid, Loader2, RotateCcw, Scale, Send, SlidersHorizontal, UsersRound, X } from 'lucide-react'
-import { decideRequest, refreshCollective, retryRequestPayout, cancelClose } from '@/app/c/[id]/actions'
+import { AlertTriangle, BookOpen, Check, History, LayoutGrid, Loader2, RotateCcw, Scale, Send, ShieldCheck, SlidersHorizontal, UsersRound, X } from 'lucide-react'
+import { decideRequest, refreshCollective, retryRequestPayout, cancelClose, checkPayPalNow } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
@@ -60,6 +60,7 @@ export function CollectiveTabs(props: {
   viewerId: string
   viewerRole: string
   exit: ExitInfo
+  outsideCheck: { enabled: boolean; lastAt: string | null; since: string | null }
   exitPolicy: string
   maxMembers: number
   inviteCode: string | null
@@ -167,6 +168,7 @@ export function CollectiveTabs(props: {
         )}
         {tab === 'Ledger' && (
           <CollapsibleSection title="Ledger" count={props.entries.length}>
+            <OutsideCheckBar collectiveId={props.collectiveId} check={props.outsideCheck} />
             <div className="card overflow-hidden">
               <LedgerGrid entries={props.entries} currency={props.currency} />
             </div>
@@ -506,6 +508,42 @@ function MembersPanel({ members }: { members: Member[] }) {
           <RoleBadge role={m.role} />
         </div>
       ))}
+    </div>
+  )
+}
+
+/** Is the ledger checked against PayPal's own history, and when was it last checked? */
+function OutsideCheckBar({ collectiveId, check }: { collectiveId: string; check: { enabled: boolean; lastAt: string | null; since: string | null } }) {
+  const [pending, start] = useTransition()
+  const [note, setNote] = useState<string | null>(null)
+  if (!check.enabled) {
+    return (
+      <div className="mb-3 flex items-start gap-2 rounded-lg bg-bg px-3 py-2 text-xs text-muted">
+        <ShieldCheck size={14} className="mt-px shrink-0" />
+        Payments made directly in PayPal are checked once this group connects its own PayPal account. This one shares the demo account with other groups.
+      </div>
+    )
+  }
+  function run() {
+    setNote(null)
+    start(async () => {
+      const r = await checkPayPalNow(collectiveId)
+      setNote(r.ok ? (r.flagged ? `${r.flagged} new movement${r.flagged === 1 ? '' : 's'} made outside CoTreasury.` : 'Everything in PayPal matches the ledger.') : r.error)
+    })
+  }
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent-soft/60 px-3 py-2 text-xs text-accent">
+      <span className="flex items-start gap-2">
+        <ShieldCheck size={14} className="mt-px shrink-0" />
+        <span>
+          Checked against PayPal&apos;s own account history{check.lastAt ? `, last at ${new Date(check.lastAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}. Anything done
+          directly in PayPal shows up red. PayPal&apos;s history can lag by a few minutes.
+          {note && <span className="ml-1 font-medium">{note}</span>}
+        </span>
+      </span>
+      <button className="btn btn-ghost !h-7 !text-xs" onClick={run} disabled={pending}>
+        {pending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Check now
+      </button>
     </div>
   )
 }

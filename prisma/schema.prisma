@@ -37,6 +37,13 @@ model Collective {
   exitPolicy  String   @default("VOTE")
   // Most active members the group allows. Changed only by a rule change.
   maxMembers  Int      @default(50)
+  // Which PayPal sandbox business account this group uses: a short key whose
+  // credentials live in env (PAYPAL_CLIENT_ID_<KEY> …). Null = the shared one.
+  paypalAccount      String?
+  // The outside-activity check flags PayPal transactions after this moment
+  // that CoTreasury didn't make (earlier history is the account's past).
+  paypalMonitorSince DateTime?
+  lastReconciledAt   DateTime?
   // "OPEN" → "CLOSING" (final settlement being paid) → "CLOSED" (read-only).
   status      String   @default("OPEN")
   closedAt    DateTime?
@@ -99,6 +106,7 @@ model LedgerEntry {
   payoutRecipientId String? // PAYOUT rows: which recipient of the proposal this pays
   goalId       String?   // CONTRIBUTION rows: which goal the money is for
   paypalRef    String?   // capture id / payout item id / transaction id
+  paypalTxnId  String?   // PayPal transaction id (as in PayPal's own history), for reconciliation
   createdAt    DateTime  @default(now())
   confirmedAt  DateTime?
 

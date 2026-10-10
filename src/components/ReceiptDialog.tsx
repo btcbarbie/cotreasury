@@ -6,7 +6,7 @@ import type { Receipt } from '@/app/api/ledger/[entryId]/receipt/route'
 import { openAsk } from '@/lib/ask'
 
 /** What the ledger itself recorded, shown when there's no PayPal transaction (imported history). */
-export type RecordedEntry = { kind: string; amount: string; date: string; counterparty: string | null; memo: string | null; status: string }
+export type RecordedEntry = { kind: string; amount: string; date: string; counterparty: string | null; memo: string | null; status: string; note?: string }
 
 /**
  * PayPal's own record of a ledger transaction, fetched live from PayPal, or,
@@ -92,7 +92,7 @@ export function ReceiptDialog({
                   </div>
                 ))}
             </dl>
-            <p className="mt-4 text-xs text-muted">Imported from the group&apos;s earlier records, so there&apos;s no PayPal transaction behind it.</p>
+            <p className="mt-4 text-xs text-muted">{recorded.note ?? 'Imported from the group’s earlier records, so there’s no PayPal transaction behind it.'}</p>
           </>
         )}
         {!recorded && !r && !state.error && (

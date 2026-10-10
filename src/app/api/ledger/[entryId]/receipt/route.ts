@@ -21,14 +21,14 @@ const money = (m?: { value: string; currency_code?: string; currency?: string })
 // live from PayPal's API, not anything CoTreasury stored itself.
 export async function GET(_req: Request, ctx: RouteContext<'/api/ledger/[entryId]/receipt'>) {
   const { entryId } = await ctx.params
-  const entry = await prisma.ledgerEntry.findUnique({ where: { id: entryId } })
+  const entry = await prisma.ledgerEntry.findUnique({ where: { id: entryId }, include: { collective: { select: { paypalAccount: true } } } })
   if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!entry.paypalRef || entry.source === 'IMPORTED') {
     return NextResponse.json({ error: 'This entry was imported from earlier records, so PayPal has no receipt for it.' }, { status: 404 })
   }
   try {
     if (entry.type === 'CONTRIBUTION') {
-      const c = await getCaptureDetail(entry.paypalRef)
+      const c = await getCaptureDetail(entry.paypalRef, entry.collective.paypalAccount)
       const r: Receipt = {
         kind: 'CAPTURE',
         transactionId: c.id,
@@ -47,7 +47,7 @@ export async function GET(_req: Request, ctx: RouteContext<'/api/ledger/[entryId
       return NextResponse.json(r)
     }
     if (entry.type === 'PAYOUT') {
-      const i = await getPayoutItem(entry.paypalRef)
+      const i = await getPayoutItem(entry.paypalRef, entry.collective.paypalAccount)
       const r: Receipt = {
         kind: 'PAYOUT_ITEM',
         transactionId: i.transaction_id ?? i.payout_item_id,

@@ -29,6 +29,8 @@ type DemoSeed = {
     kind: string
     exitPolicy: 'NO_REFUNDS' | 'UNSPENT_SHARE' | 'VOTE'
     maxMembers: number
+    /** Key for this group's own sandbox account: PAYPAL_CLIENT_ID_<KEY> etc. Falls back to the shared one until set. */
+    paypalAccount: string
     paypalEmail: string
     domain: string
     members: MemberSeed[]
@@ -48,6 +50,7 @@ async function createCollective(prisma: PrismaClient, data: DemoSeed) {
       kind: data.kind,
       exitPolicy: data.exitPolicy,
       maxMembers: data.maxMembers,
+      paypalAccount: data.paypalAccount,
       paypalEmail: data.paypalEmail,
       isDemo: true,
       tiers: { create: data.tiers },
@@ -183,6 +186,7 @@ const DEMO_SEEDS: DemoSeed[] = [
     kind: 'SCHOLARSHIP_FUND',
     exitPolicy: 'NO_REFUNDS',
     maxMembers: 25,
+    paypalAccount: 'MAYA',
     paypalEmail: 'maya.scholarship@example.com',
     domain: 'friends.example',
     members: [
@@ -229,6 +233,7 @@ const DEMO_SEEDS: DemoSeed[] = [
     kind: 'GROUP_TRIP',
     exitPolicy: 'UNSPENT_SHARE',
     maxMembers: 8,
+    paypalAccount: 'LISBON',
     paypalEmail: 'lisbon.trip@example.com',
     domain: 'friends.example',
     members: [
@@ -275,6 +280,7 @@ const DEMO_SEEDS: DemoSeed[] = [
     kind: 'HOUSEHOLD',
     exitPolicy: 'VOTE',
     maxMembers: 2,
+    paypalAccount: 'JOHNSONS',
     paypalEmail: 'the.johnsons@example.com',
     domain: 'home.example',
     members: [
@@ -323,6 +329,7 @@ export async function ensureDemoCollectives(prisma: PrismaClient) {
   for (const seed of DEMO_SEEDS) {
     await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, exitPolicy: 'VOTE', status: 'OPEN' }, data: { exitPolicy: seed.exitPolicy } })
     await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, maxMembers: 50 }, data: { maxMembers: seed.maxMembers } })
+    await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, paypalAccount: null }, data: { paypalAccount: seed.paypalAccount } })
   }
   const created: string[] = []
   for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.name))) {

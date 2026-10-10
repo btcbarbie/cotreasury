@@ -82,6 +82,18 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
     }
   }
 
+  // Money that moved in the PayPal account outside CoTreasury: nobody approved it here.
+  for (const e of p.entries.filter((x) => x.type === 'UNAPPROVED_MOVEMENT')) {
+    items.push({
+      key: `um-${e.id}`,
+      group: 'Problems',
+      tone: 'text-red bg-red-soft',
+      Icon: AlertTriangle,
+      title: `${m(e.amountCents)} moved outside CoTreasury`,
+      detail: `PayPal's history shows this in the group's account, but nobody requested or approved it here${e.counterparty ? ` (${e.counterparty})` : ''}. Ask the account owner about it. It's marked red in the ledger.`,
+    })
+  }
+
   return items
 }
 

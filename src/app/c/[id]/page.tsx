@@ -13,7 +13,7 @@ import { RequestPaymentButton } from '@/components/RequestPaymentButton'
 import { AskButton } from '@/components/AskButton'
 import { canApprove } from '@/lib/treasury'
 import { goalProgress } from '@/lib/goals'
-import { getMerchantAccount } from '@/lib/paypal'
+import { getMerchantAccount, hasOwnAccount, publicClientId } from '@/lib/paypal'
 import { unseenFor } from '@/lib/notifications'
 import { NotificationsCard } from '@/components/NotificationsCard'
 import { ApprovalsPill } from '@/components/ApprovalsPill'
@@ -43,9 +43,11 @@ async function CollectiveContent({
   const sp = await searchParams
   const justCreated = sp.created === '1'
   const justJoined = sp.joined === '1'
-  const [view, account] = await Promise.all([getCollectiveView(id), getMerchantAccount()])
+  const view = await getCollectiveView(id)
   if (!view) notFound()
   const { collective, viewer, treasury } = view
+  const ownAccount = hasOwnAccount(collective.paypalAccount)
+  const account = await getMerchantAccount(collective.paypalAccount)
   const notifications = await unseenFor(collective.id, viewer)
   const lock = await treasuryLock(collective.id)
   const closeVote = collective.proposals.some((p) => p.kind === 'CLOSE' && p.status === 'PENDING_APPROVAL')
@@ -139,7 +141,9 @@ async function CollectiveContent({
             <span className="truncate font-mono text-xs text-ink/80" title={account.merchantId ? `PayPal merchant ID ${account.merchantId}` : undefined}>
               {account.email ?? 'PayPal sandbox business account'}
             </span>
-            <span className="text-xs text-muted">· shared by all demo treasuries; in real use each group connects its own</span>
+            <span className="text-xs text-muted">
+              {ownAccount ? '· this group’s own PayPal business account' : '· shared by treasuries without their own account; in real use each group connects its own'}
+            </span>
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:items-end">
@@ -151,7 +155,7 @@ async function CollectiveContent({
             collectiveId={collective.id}
             collectiveName={collective.name}
             currency={cur}
-            clientId={process.env.PAYPAL_CLIENT_ID ?? ''}
+            clientId={publicClientId(collective.paypalAccount)}
             viewerName={viewer.name}
             goals={collective.goals.map((g) => ({ id: g.id, title: g.title }))}
           />
@@ -235,6 +239,7 @@ async function CollectiveContent({
         viewerId={viewer.id}
         viewerRole={viewer.role}
         exit={exit}
+        outsideCheck={{ enabled: ownAccount, lastAt: collective.lastReconciledAt?.toISOString() ?? null, since: collective.paypalMonitorSince?.toISOString() ?? null }}
         exitPolicy={collective.exitPolicy}
         maxMembers={collective.maxMembers}
         inviteCode={viewer.role === 'ADMIN' ? collective.inviteCode : null}

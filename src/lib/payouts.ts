@@ -85,7 +85,7 @@ export async function executePayout(proposalId: string): Promise<{ ok: boolean; 
         amountCents: r.amountCents,
         note: `${p.title} (${c.name})`,
       })),
-    })
+    }, c.paypalAccount)
     await prisma.proposal.update({ where: { id: p.id }, data: { paypalBatchId: batch.batch_header.payout_batch_id } })
     await recordEvent(c.id, {
       actor: 'CoTreasury',
@@ -148,6 +148,8 @@ export async function applyPayoutItem(item: PayoutItem, source: 'PAYPAL_WEBHOOK'
         status: outcome.ledger,
         source,
         paypalRef: item.payout_item_id,
+        // PayPal's transaction id, as it appears in the account's history (for reconciliation).
+        ...(item.transaction_id ? { paypalTxnId: item.transaction_id } : {}),
         confirmedAt: outcome.ledger === 'CONFIRMED' ? new Date() : null,
       },
     }),
@@ -179,9 +181,9 @@ async function finalize(proposalId: string) {
 
 /** Backup path when a webhook is late: ask PayPal for the batch and apply every item. */
 export async function refreshPayoutBatch(proposalId: string) {
-  const p = await prisma.proposal.findUnique({ where: { id: proposalId } })
+  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, include: { collective: { select: { paypalAccount: true } } } })
   if (!p?.paypalBatchId || p.status !== 'EXECUTING') return
-  const batch = await getPayoutBatch(p.paypalBatchId)
+  const batch = await getPayoutBatch(p.paypalBatchId, p.collective.paypalAccount)
   if (batch.batch_header.batch_status === 'DENIED') return applyBatchDenied(p.paypalBatchId)
   for (const item of batch.items ?? []) await applyPayoutItem(item, 'PAYPAL_API')
 }
