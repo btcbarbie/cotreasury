@@ -105,8 +105,8 @@ export function ActivityPanel({ collectiveId, events }: { collectiveId: string; 
                 <span>
                   {new Date(e.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                 </span>
-                <span className="font-mono">
-                  #{e.seq} · seal {e.hash.slice(0, 12)}
+                <span className="font-mono" title={`Seal ${e.hash}`}>
+                  #{e.seq}
                 </span>
               </div>
             </div>
