@@ -9,21 +9,6 @@ export type ActivityEvent = { id: string; seq: number; actor: string; action: st
 
 type Check = Awaited<ReturnType<typeof checkIntegrity>>
 
-// The stored wording is sealed into the hash chain and never changes. Only the
-// display does: anything in brackets is shown as a small label under the line.
-function splitLabels(summary: string) {
-  const labels: string[] = []
-  const text = summary
-    .replace(/\s*\(([^()]*)\)/g, (_, inner: string) => {
-      const t = inner.trim()
-      labels.push(t.charAt(0).toUpperCase() + t.slice(1))
-      return ''
-    })
-    .replace(/\s+([.,;:])/g, '$1')
-    .trim()
-  return { text, labels }
-}
-
 function ActorMark({ actor }: { actor: string }) {
   if (actor === 'PayPal')
     return <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-soft text-[10px] font-bold text-blue">PP</span>
@@ -72,24 +57,13 @@ export function ActivityPanel({ collectiveId, events }: { collectiveId: string; 
 
       <div className="card divide-y divide-line">
         {events.length === 0 && <div className="px-5 py-10 text-center text-sm text-muted">No activity yet.</div>}
-        {events.map((e) => {
-          const { text, labels } = splitLabels(e.summary)
-          return (
+        {events.map((e) => (
           <div key={e.id} className="flex items-start gap-3 px-4 py-3">
             <ActorMark actor={e.actor} />
             <div className="min-w-0 flex-1">
               <div className="text-sm">
-                <span className="font-medium">{e.actor}</span> {text}
+                <span className="font-medium">{e.actor}</span> {e.summary}
               </div>
-              {labels.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {labels.map((l, i) => (
-                    <span key={i} className="rounded-full bg-bg px-2 py-0.5 text-[11px] text-muted ring-1 ring-line">
-                      {l}
-                    </span>
-                  ))}
-                </div>
-              )}
               <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-faint">
                 <span>
                   {new Date(e.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
@@ -100,8 +74,7 @@ export function ActivityPanel({ collectiveId, events }: { collectiveId: string; 
               </div>
             </div>
           </div>
-          )
-        })}
+        ))}
       </div>
     </div>
   )
