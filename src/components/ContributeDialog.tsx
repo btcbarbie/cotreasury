@@ -51,7 +51,7 @@ type Phase =
 
 type GoalOption = { id: string; title: string }
 
-export function ContributeButton(props: { collectiveId: string; collectiveName: string; currency: string; clientId: string; viewerName: string; goals: GoalOption[] }) {
+export function ContributeButton(props: { collectiveId: string; collectiveName: string; currency: string; clientId: string; viewerName: string; goals: GoalOption[]; noRefunds: boolean }) {
   const [open, setOpen] = useState<{ goalId: string | null; amountCents: number } | null>(null)
 
   // Goal cards ask to open the dialog pre-filled with their goal and what the viewer still owes.
@@ -83,6 +83,7 @@ function ContributeDialog({
   goals,
   initialGoalId,
   initialAmountCents,
+  noRefunds,
   onClose,
 }: {
   collectiveId: string
@@ -91,6 +92,8 @@ function ContributeDialog({
   clientId: string
   viewerName: string
   goals: GoalOption[]
+  /** The group's exit policy is no refunds: warn before anyone pays. */
+  noRefunds: boolean
   initialGoalId: string | null
   initialAmountCents: number
   onClose: () => void
@@ -277,6 +280,11 @@ function ContributeDialog({
                 </>
               )}
             </div>
+            {noRefunds && (
+              <p className="mt-4 rounded-lg bg-amber-soft px-3 py-2 text-xs leading-relaxed text-amber">
+                <span className="font-semibold">No refunds.</span> This group keeps what members pay in: if you leave later, your contributions stay with the group.
+              </p>
+            )}
             <p className="mt-4 flex items-start gap-2 text-xs text-muted">
               <ShieldCheck size={14} className="mt-px shrink-0 text-accent" />
               Paid straight into the group&apos;s own PayPal account. It appears in the ledger once PayPal confirms it.

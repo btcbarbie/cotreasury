@@ -18,9 +18,9 @@ export function Avatar({ name, size = 30 }: { name: string; size?: number }) {
   )
 }
 
-const ROLE_LABEL: Record<string, string> = { ADMIN: 'Admin', APPROVER: 'Approver', MEMBER: 'Member' }
+const ROLE_LABEL: Record<string, string> = { ADMIN: 'Admin', APPROVER: 'Approver', MEMBER: 'Member', DISPUTING: 'Refund dispute · can’t vote' }
 
 export function RoleBadge({ role }: { role: string }) {
   if (role === 'MEMBER') return <span className="text-xs text-muted">Member</span>
-  return <span className={`pill ${role === 'ADMIN' ? 'pill-blue' : 'pill-green'} !h-[18px] !text-[11px]`}>{ROLE_LABEL[role]}</span>
+  return <span className={`pill ${role === 'ADMIN' ? 'pill-blue' : role === 'DISPUTING' ? 'pill-amber' : 'pill-green'} !h-[18px] !text-[11px]`}>{ROLE_LABEL[role]}</span>
 }

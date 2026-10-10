@@ -17,6 +17,7 @@ export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id
   const collective = await prisma.collective.findUnique({ where: { id }, include: { goals: true } })
   const viewer = await getViewer(id)
   if (!collective || !viewer) return NextResponse.json({ error: 'Collective not found' }, { status: 404 })
+  if (viewer.role === 'DISPUTING') return NextResponse.json({ error: 'While your refund dispute with PayPal is open, you can’t add funds.' }, { status: 409 })
   const locked = await treasuryLock(id)
   if (locked) return NextResponse.json({ error: locked }, { status: 409 })
   const goal = goalId ? collective.goals.find((g) => g.id === goalId) : null

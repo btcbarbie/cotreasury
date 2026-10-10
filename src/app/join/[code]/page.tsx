@@ -27,7 +27,7 @@ async function Invite({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const c = await prisma.collective.findFirst({
     where: { inviteCode: code, status: 'OPEN' },
-    select: { name: true, purpose: true, maxMembers: true, members: { where: { role: { not: 'FORMER' } }, select: { role: true } } },
+    select: { name: true, purpose: true, maxMembers: true, exitPolicy: true, members: { where: { role: { not: 'FORMER' } }, select: { role: true } } },
   })
   if (!c) {
     return (
@@ -51,6 +51,11 @@ async function Invite({ params }: { params: Promise<{ code: string }> }) {
         <li>• Add funds and request payouts. The group&apos;s approvers vote on every payout.</li>
         <li>• Nobody, including the admin, can move money without the group&apos;s rules being met.</li>
       </ul>
+      {c.exitPolicy === 'NO_REFUNDS' && (
+        <div className="mt-4 rounded-lg bg-amber-soft px-4 py-3 text-sm text-amber">
+          <span className="font-semibold">No refunds.</span> Money you put into this group stays with it, even if you leave later.
+        </div>
+      )}
       {c.members.length >= c.maxMembers ? (
         <div className="mt-5 rounded-lg bg-bg px-4 py-3 text-sm text-muted">
           This group is full. Ask the admin; the group can raise its member limit with a rule change.

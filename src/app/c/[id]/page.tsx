@@ -64,9 +64,14 @@ async function CollectiveContent({
     meLeaving: viewer.leaving,
     rejectedRefund: (() => {
       const last = collective.proposals.find((p) => p.kind === 'REFUND' && p.proposedById === viewer.id)
-      return last && last.status === 'REJECTED' && !viewer.leaving ? { amountCents: last.amountCents, at: last.createdAt.toISOString() } : null
+      return last && last.status === 'REJECTED' && !viewer.leaving && viewer.role !== 'DISPUTING' && collective.exitPolicy !== 'NO_REFUNDS'
+        ? { amountCents: last.amountCents, at: last.createdAt.toISOString() }
+        : null
     })(),
-    myRefundCents: collective.proposals.find((p) => p.kind === 'REFUND' && p.proposedById === viewer.id && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'FAILED'].includes(p.status))?.amountCents ?? 0,
+    myRefundCents:
+      collective.proposals.find(
+        (p) => p.proposedById === viewer.id && ((p.kind === 'REFUND' && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'FAILED'].includes(p.status)) || (p.kind === 'HOLD' && p.status === 'APPROVED')),
+      )?.amountCents ?? 0,
     closeShares: fairShares(collective.members, collective.entries, treasury.availableCents, true).map(({ memberId, name, contributedCents, shareCents }) => ({ memberId, name, contributedCents, shareCents })),
   }
   const cur = collective.currency
@@ -170,6 +175,7 @@ async function CollectiveContent({
             clientId={publicClientId(collective.paypalAccount)}
             viewerName={viewer.name}
             goals={collective.goals.map((g) => ({ id: g.id, title: g.title }))}
+            noRefunds={collective.exitPolicy === 'NO_REFUNDS'}
           />
           </div>
           )}

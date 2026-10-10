@@ -9,6 +9,7 @@ import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
 import { AddMemberButton, TreasuryDetailsCard } from './SettingsPanels'
 import { ExitPanel, type ExitInfo } from './ExitPanel'
+import { DisputeCard } from './DisputeCard'
 import { OverviewPanel } from './OverviewPanel'
 import { CollapsibleSection, MinimizeButton } from './Collapsible'
 import { AttentionPanel, AttentionRow, attentionItems } from './AttentionPanel'
@@ -98,7 +99,9 @@ export function CollectiveTabs(props: {
   // Overview → Needs attention; everything else is history in the activity log.
   const live = props.proposals.filter((p) => ['PENDING_APPROVAL', 'EXECUTING', 'FAILED'].includes(p.status))
   const otherItems = attention.filter((i) => !/^[pef]-/.test(i.key)) // unclaimed / returned payouts
-  const needsCount = live.length + otherItems.length
+  // Money held during a refund dispute with PayPal.
+  const holds = props.proposals.filter((p) => p.kind === 'HOLD' && p.status === 'APPROVED')
+  const needsCount = live.length + otherItems.length + holds.length
   const counts: Partial<Record<Tab, number>> = {
     Overview: needsCount || undefined,
     'Activity log': props.events.length || undefined,
@@ -142,7 +145,7 @@ export function CollectiveTabs(props: {
             />
             <CollapsibleSection title="Needs attention" count={needsCount || undefined}>
               <div className="grid gap-3">
-                {live.length === 0 && otherItems.length === 0 && <AttentionPanel items={[]} onOpenRequests={() => {}} />}
+                {live.length === 0 && otherItems.length === 0 && holds.length === 0 && <AttentionPanel items={[]} onOpenRequests={() => {}} />}
                 {/* Requests and notices in one list, newest first. */}
                 {[
                   ...live.map((p) => ({ at: p.createdAt, key: p.id, node: (
@@ -156,6 +159,11 @@ export function CollectiveTabs(props: {
                     />
                   ) })),
                   ...otherItems.map((i) => ({ at: i.at, key: i.key, node: <AttentionRow key={i.key} item={i} /> })),
+                  ...holds.map((h) => ({
+                    at: h.createdAt,
+                    key: h.id,
+                    node: <DisputeCard key={h.id} hold={h} currency={props.currency} canRecord={props.viewerRole === 'APPROVER' || props.viewerRole === 'ADMIN'} />,
+                  })),
                 ]
                   .sort((a, b) => b.at.localeCompare(a.at))
                   .map((x) => x.node)}

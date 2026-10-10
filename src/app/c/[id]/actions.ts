@@ -42,6 +42,7 @@ type Result = { ok: true } | { ok: false; error: string }
 export async function submitRequest(collectiveId: string, draft: DraftRequest): Promise<Result> {
   const viewer = await getViewer(collectiveId)
   if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
+  if (viewer.role === 'DISPUTING') return { ok: false, error: 'While your refund dispute with PayPal is open, you can’t request payouts.' }
 
   const recipients: NewRecipient[] = []
   for (const r of draft.recipients ?? []) {
@@ -116,7 +117,7 @@ async function createPayoutProposal(
  * Leave the group. Nobody can be made to stay, so this needs no vote. Any
  * refund follows the group's exit policy and is approved like any payout.
  */
-export async function leaveTreasury(collectiveId: string, input: { refundCents?: number; waiveRefund?: boolean } = {}): Promise<Result> {
+export async function leaveTreasury(collectiveId: string, input: { refundCents?: number } = {}): Promise<Result> {
   const viewer = await getViewer(collectiveId)
   if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
   if (viewer.role === 'ADMIN') return { ok: false, error: 'The admin can’t leave. To end the group, propose closing the treasury.' }
@@ -139,12 +140,11 @@ export async function leaveTreasury(collectiveId: string, input: { refundCents?:
   // aren't counted again, so two people leaving never share the same money.
   const pendingRefunds = c.proposals.filter((p) => p.kind === 'REFUND' && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(p.status))
   const available = computeTreasury(c.entries, c.proposals).availableCents - pendingRefunds.filter((p) => p.status === 'PENDING_APPROVAL').reduce((s, p) => s + p.amountCents, 0)
-  const staying = c.members.filter((m) => !m.leaving || m.id === viewer.id)
+  const staying = c.members.filter((m) => (!m.leaving && m.role !== 'DISPUTING') || m.id === viewer.id)
   const mine = fairShares(staying, c.entries, available).find((s) => s.memberId === viewer.id)!
   const policy = c.exitPolicy as ExitPolicy
-  const refundCents = input.waiveRefund
-    ? 0
-    : policy === 'UNSPENT_SHARE'
+  const refundCents =
+    policy === 'UNSPENT_SHARE'
       ? mine.shareCents
       : policy === 'VOTE'
         ? Math.max(0, Math.min(Math.round(input.refundCents ?? mine.shareCents), mine.contributedCents, available))
@@ -161,9 +161,7 @@ export async function leaveTreasury(collectiveId: string, input: { refundCents?:
         {
           actor: viewer.name,
           action: 'MEMBER_LEFT',
-          summary: input.waiveRefund
-            ? 'left the group without a refund after the group rejected it. Their contributions and that decision stay on the record'
-            : `left the group${policy === 'NO_REFUNDS' ? ' (no refunds: contributions stay with the cause)' : ''}`,
+          summary: `left the group${policy === 'NO_REFUNDS' ? ' (no refunds: contributions stay with the cause)' : ''}`,
           data: { memberId: viewer.id, policy, refundCents, contributedCents: mine.contributedCents },
         },
         tx,
@@ -203,6 +201,118 @@ export async function leaveTreasury(collectiveId: string, input: { refundCents?:
   return { ok: true }
 }
 
+/**
+ * After the group rejects their refund, a leaving member can take it up with
+ * PayPal. They stay listed but can no longer vote, and the amount is held:
+ * still in the balance, but the group can't spend it until PayPal decides.
+ */
+export async function disputeRefund(collectiveId: string): Promise<Result> {
+  const viewer = await getViewer(collectiveId)
+  if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
+  if (viewer.role === 'DISPUTING') return { ok: false, error: 'Your dispute is already open.' }
+  const c = await prisma.collective.findUniqueOrThrow({ where: { id: collectiveId }, select: { exitPolicy: true, currency: true } })
+  if (c.exitPolicy === 'NO_REFUNDS') return { ok: false, error: 'This group gives no refunds.' }
+  const last = await prisma.proposal.findFirst({ where: { collectiveId, kind: 'REFUND', proposedById: viewer.id }, orderBy: { createdAt: 'desc' } })
+  if (!last || last.status !== 'REJECTED') return { ok: false, error: 'There’s no rejected refund to take up with PayPal.' }
+  await prisma.$transaction(async (tx) => {
+    await tx.member.update({ where: { id: viewer.id }, data: { role: 'DISPUTING', leaving: false } })
+    // Their panel seats are re-drawn the next time anyone opens the treasury.
+    await tx.proposalReviewer.updateMany({ where: { memberId: viewer.id, status: 'ACTIVE' }, data: { expiresAt: new Date() } })
+    await tx.proposal.create({
+      data: {
+        collectiveId,
+        kind: 'HOLD',
+        status: 'APPROVED', // counts as committed, so it can't be spent
+        title: `Held for ${viewer.name}: refund dispute with PayPal`,
+        description: `${viewer.name}'s ${formatMoney(last.amountCents, c.currency, { cents: true })} refund was rejected by the group. They took it up with PayPal, so the amount is held until PayPal decides.`,
+        amountCents: last.amountCents,
+        requiredApprovals: 0,
+        proposedById: viewer.id,
+      },
+    })
+    await recordEvent(
+      collectiveId,
+      {
+        actor: viewer.name,
+        action: 'REFUND_DISPUTED',
+        summary: `took their ${formatMoney(last.amountCents, c.currency, { cents: true })} refund up with PayPal. That amount is held and can't be spent until PayPal decides, and they can no longer vote`,
+        data: { memberId: viewer.id, refundProposalId: last.id, amountCents: last.amountCents },
+      },
+      tx,
+    )
+  })
+  refresh()
+  return { ok: true }
+}
+
+/**
+ * An approver records PayPal's decision on a refund dispute, with its case ID.
+ * PayPal's ruling settles it: no further vote. For the member, the held amount
+ * is paid out through PayPal and they leave once it's paid; for the group, the
+ * money returns to the pot and they leave without a refund.
+ */
+export async function resolveDispute(holdId: string, input: { outcome: 'MEMBER' | 'GROUP'; caseId: string }): Promise<Result> {
+  const hold = await prisma.proposal.findUnique({ where: { id: holdId }, include: { proposedBy: true, collective: { select: { currency: true } } } })
+  if (!hold || hold.kind !== 'HOLD' || hold.status !== 'APPROVED' || !hold.proposedBy) return { ok: false, error: 'There’s no open dispute to resolve.' }
+  const viewer = await getViewer(hold.collectiveId)
+  if (!viewer || !canApprove(viewer.role)) return { ok: false, error: 'Only approvers can record PayPal’s decision.' }
+  const caseId = String(input.caseId ?? '').trim().slice(0, 60)
+  if (caseId.length < 4) return { ok: false, error: 'Enter the PayPal case ID so the decision can be checked.' }
+  const member = hold.proposedBy
+  const amount = formatMoney(hold.amountCents, hold.collective.currency, { cents: true })
+
+  if (input.outcome === 'GROUP') {
+    await prisma.$transaction(async (tx) => {
+      await tx.proposal.update({ where: { id: hold.id }, data: { status: 'COMPLETED' } })
+      await tx.member.update({ where: { id: member.id }, data: { role: 'FORMER' } })
+      await recordEvent(
+        hold.collectiveId,
+        {
+          actor: viewer.name,
+          action: 'DISPUTE_RESOLVED',
+          summary: `recorded PayPal's decision (case ${caseId}): it sided with the group. The held ${amount} returns to the pot and ${member.name} leaves without a refund`,
+          data: { holdId: hold.id, caseId, outcome: 'GROUP', memberId: member.id },
+        },
+        tx,
+      )
+    })
+    refresh()
+    return { ok: true }
+  }
+
+  // PayPal sided with the member: pay the held amount, no vote needed.
+  const refund = await prisma.$transaction(async (tx) => {
+    await tx.proposal.update({ where: { id: hold.id }, data: { status: 'COMPLETED' } })
+    const p = await tx.proposal.create({
+      data: {
+        collectiveId: hold.collectiveId,
+        kind: 'REFUND',
+        status: 'APPROVED',
+        title: `Refund for ${member.name} (PayPal case ${caseId})`,
+        description: `PayPal decided ${member.name}'s refund dispute in their favour (case ${caseId}), so the held ${amount} is paid without another vote.`,
+        amountCents: hold.amountCents,
+        requiredApprovals: 0,
+        proposedById: member.id,
+        recipients: { create: [{ name: member.name, receiver: member.email, receiverType: 'EMAIL', amountCents: hold.amountCents }] },
+      },
+    })
+    await recordEvent(
+      hold.collectiveId,
+      {
+        actor: viewer.name,
+        action: 'DISPUTE_RESOLVED',
+        summary: `recorded PayPal's decision (case ${caseId}): it sided with ${member.name}. The held ${amount} is being paid to them through PayPal, and they leave once it's paid`,
+        data: { holdId: hold.id, caseId, outcome: 'MEMBER', memberId: member.id, refundProposalId: p.id },
+      },
+      tx,
+    )
+    return p
+  })
+  const sent = await executePayout(refund.id)
+  refresh()
+  return sent.ok ? { ok: true } : { ok: false, error: sent.error ?? 'PayPal payout failed.' }
+}
+
 type ClosePlan = { mode: 'SPLIT' } | { mode: 'SINGLE'; name: string; receiver: string; receiverType: ReceiverType }
 
 /**
@@ -217,6 +327,9 @@ export async function proposeClose(collectiveId: string, plan: ClosePlan): Promi
   if (await openPayoutCount(collectiveId)) return { ok: false, error: 'Finish or reject the open payout requests first, so the final numbers are settled.' }
   if (await prisma.proposal.count({ where: { collectiveId, kind: 'RULE_CHANGE', status: 'PENDING_APPROVAL' } })) {
     return { ok: false, error: 'A rule change is waiting for approval. Settle it before proposing to close.' }
+  }
+  if (await prisma.proposal.count({ where: { collectiveId, kind: 'HOLD', status: 'APPROVED' } })) {
+    return { ok: false, error: 'A refund dispute with PayPal is still open. It has to be resolved before the treasury can close.' }
   }
   const c = await prisma.collective.findUniqueOrThrow({
     where: { id: collectiveId },

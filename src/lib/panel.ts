@@ -27,7 +27,7 @@ export function seededOrder<T extends { id: string }>(items: T[], seed: string, 
 
 /** Officer pool and member pool for a request, never including the person who asked. */
 function pools(members: Member[], makerId: string | null, mode: string) {
-  const eligible = members.filter((m) => m.id !== makerId && m.role !== 'FORMER')
+  const eligible = members.filter((m) => m.id !== makerId && m.role !== 'FORMER' && m.role !== 'DISPUTING')
   if (mode === 'MIXED') {
     return { officers: eligible.filter((m) => canApprove(m.role)), others: eligible }
   }

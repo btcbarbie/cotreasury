@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Archive, Loader2, LogOut } from 'lucide-react'
-import { leaveTreasury, proposeClose } from '@/app/c/[id]/actions'
+import { disputeRefund, leaveTreasury, proposeClose } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { EXIT_POLICIES } from '@/lib/exitPolicy'
 import { RECEIVER_TYPES, type ReceiverType } from '@/lib/recipients'
@@ -40,6 +40,10 @@ export function ExitPanel({ collectiveId, currency, viewerRole, exit }: { collec
         <p className="mt-2 text-xs text-muted">The group can change this with a rule change. CoTreasury does the maths from the ledger; people approve every payout.</p>
         {exit.lock ? (
           <div className="mt-4 rounded-lg bg-bg px-3 py-2 text-sm text-muted">{exit.lock}</div>
+        ) : viewerRole === 'DISPUTING' ? (
+          <div className="mt-4 rounded-lg bg-amber-soft px-3 py-2 text-sm text-amber">
+            You’re taking your refund up with PayPal. {m(exit.myRefundCents)} is held: the group can’t spend it until PayPal decides. You stay listed meanwhile, but can’t vote.
+          </div>
         ) : exit.meLeaving ? (
           <div className="mt-4 rounded-lg bg-amber-soft px-3 py-2 text-sm text-amber">
             You’ve asked to leave. Your {m(exit.myRefundCents)} refund is waiting for the group to approve and pay it. You stay a member until then; if it’s rejected, you simply stay.
@@ -104,10 +108,10 @@ function LeaveForm({
     })
   }
 
-  function leaveWithoutRefund() {
+  function takeToPayPal() {
     setError(null)
     start(async () => {
-      const r = await leaveTreasury(collectiveId, { waiveRefund: true })
+      const r = await disputeRefund(collectiveId)
       if (!r.ok) setError(r.error)
     })
   }
@@ -116,12 +120,12 @@ function LeaveForm({
     <div className="mt-4 rounded-xl border border-line p-4 text-sm">
       {rejected && (
         <div className="mb-3 rounded-lg bg-amber-soft px-3 py-2 text-amber">
-          The group rejected your {m(rejected.amountCents)} refund on {new Date(rejected.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. You’re still a member. If
-          you still want to leave, you can ask again, or leave without a refund and take it up with PayPal: your contributions and this decision are recorded in the ledger and
-          the sealed activity log.
+          The group rejected your {m(rejected.amountCents)} refund on {new Date(rejected.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. You’re still a member.
+          You can ask again, or take it up with PayPal: your contributions and this decision are recorded in the ledger and the sealed activity log. If you take it to PayPal,
+          you’ll stay listed but can’t vote, and your {m(rejected.amountCents)} is held so the group can’t spend it until PayPal decides.
           <div className="mt-2">
-            <button className="btn btn-ghost !h-8 bg-white" onClick={leaveWithoutRefund} disabled={pending}>
-              <LogOut size={14} /> Leave without a refund
+            <button className="btn btn-ghost !h-8 bg-white" onClick={takeToPayPal} disabled={pending}>
+              Take it up with PayPal
             </button>
           </div>
         </div>

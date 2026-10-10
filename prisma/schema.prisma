@@ -64,7 +64,7 @@ model Member {
   collectiveId String
   name         String
   email        String
-  role         String   @default("MEMBER") // "MEMBER" | "APPROVER" | "ADMIN"
+  role         String   @default("MEMBER") // "MEMBER" | "APPROVER" | "ADMIN" | "DISPUTING" (refund dispute with PayPal: listed, cannot vote) | "FORMER"
   // Notifications: the activity-log sequence number this member has seen up to.
   lastSeenSeq  Int      @default(0)
   // Asked to leave with a refund: still a member until the refund is paid; back to normal if it's rejected.
@@ -122,7 +122,7 @@ model LedgerEntry {
 model Proposal {
   id                String   @id @default(cuid())
   collectiveId      String
-  kind              String   @default("SPEND") // "SPEND" | "RULE_CHANGE" | "REFUND" (to a departing member) | "CLOSE" (final settlement)
+  kind              String   @default("SPEND") // "SPEND" | "RULE_CHANGE" | "REFUND" (to a departing member) | "CLOSE" (final settlement) | "HOLD" (money set aside during a refund dispute; APPROVED while held)
   title             String
   description       String?
   amountCents       Int

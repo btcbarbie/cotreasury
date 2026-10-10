@@ -24,6 +24,8 @@ const LOOK: Record<string, { Icon: typeof Bell; tone: string }> = {
   MEMBER_LEAVING: { Icon: LogOut, tone: 'bg-amber-soft text-amber' },
   MEMBER_LEFT: { Icon: LogOut, tone: 'bg-amber-soft text-amber' },
   MEMBER_STAYED: { Icon: UserPlus, tone: 'bg-accent-soft text-accent' },
+  REFUND_DISPUTED: { Icon: Scale, tone: 'bg-amber-soft text-amber' },
+  DISPUTE_RESOLVED: { Icon: Scale, tone: 'bg-violet-soft text-violet' },
   CLOSE_PROPOSED: { Icon: Archive, tone: 'bg-red-soft text-red' },
   TREASURY_CLOSING: { Icon: Archive, tone: 'bg-red-soft text-red' },
   TREASURY_CLOSED: { Icon: Archive, tone: 'bg-bg text-muted' },
