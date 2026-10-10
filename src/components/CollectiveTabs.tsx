@@ -11,7 +11,6 @@ import { AddMemberButton, InviteLinkCard, TreasuryDetailsCard } from './Settings
 import { ExitPanel, type ExitInfo } from './ExitPanel'
 import { OverviewPanel } from './OverviewPanel'
 import { CollapsibleSection, MinimizeButton } from './Collapsible'
-import { TreasurerPanel } from './TreasurerPanel'
 import { AttentionPanel, attentionItems } from './AttentionPanel'
 import { ActivityPanel, type ActivityEvent } from './ActivityPanel'
 import type { GoalProgress } from '@/lib/goals'
@@ -152,14 +151,6 @@ export function CollectiveTabs(props: {
         )}
         {tab === 'Activity log' && (
           <div className="grid gap-10">
-            <TreasurerPanel
-              key={props.viewerId}
-              variant="assistant"
-              collectiveId={props.collectiveId}
-              kind={props.kind}
-              currency={props.currency}
-              brief={`Hi ${props.viewerName.split(' ')[0]}. Tell me what you need: I can **request a payout** for you (I'll ask who, how much and why) or **add funds** to the pool, including anything you still owe for a goal.`}
-            />
             <CollapsibleSection title="Every action" count={props.events.length}>
               <ActivityPanel collectiveId={props.collectiveId} events={props.events} />
             </CollapsibleSection>

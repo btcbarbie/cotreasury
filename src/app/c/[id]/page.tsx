@@ -10,7 +10,7 @@ import { HeaderSlot } from '@/components/HeaderSlot'
 import { CollectiveTabs } from '@/components/CollectiveTabs'
 import { ContributeButton } from '@/components/ContributeDialog'
 import { RequestPaymentButton } from '@/components/RequestPaymentButton'
-import { TreasurerPanel } from '@/components/TreasurerPanel'
+import { AskButton } from '@/components/AskButton'
 import { canApprove } from '@/lib/treasury'
 import { goalProgress } from '@/lib/goals'
 import { getMerchantAccount } from '@/lib/paypal'
@@ -221,8 +221,8 @@ async function CollectiveContent({
       )}
 
 
-      {/* Keyed by viewer: each member's chat is private and starts fresh when you switch. */}
-      <TreasurerPanel key={viewer.id} collectiveId={collective.id} kind={collective.kind} currency={cur} brief={brief} />
+      {/* The one AI entry point. Keyed by viewer: each member's chat is private and starts fresh when you switch. */}
+      <AskButton key={viewer.id} collectiveId={collective.id} kind={collective.kind} currency={cur} brief={brief} />
 
       <CollectiveTabs
         collectiveId={collective.id}

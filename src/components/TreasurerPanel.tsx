@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { AlertTriangle, ArrowUp, Check, FileText, HandCoins, Loader2, Lock, Sparkles, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { submitRequest } from '@/app/c/[id]/actions'
-import { MinimizeButton } from './Collapsible'
 import type { ContributionDraft, DraftRequest, TreasurerReply } from '@/lib/treasurer'
 
 type Turn = { role: 'user'; content: string } | ({ role: 'assistant'; content: string } & Omit<TreasurerReply, 'answer'>)
@@ -51,27 +50,27 @@ function Rich({ text }: { text: string }) {
   )
 }
 
-const ASSISTANT_SUGGESTIONS = ['I want to request a payout', 'I want to pay what I owe', 'Add $50 to the general fund']
+// Things people come to the AI for: a question about the money, a payout, paying what they owe.
+const ACTION_SUGGESTIONS = ['I want to request a payout', 'I want to pay what I owe']
 
 /**
- * The AI Treasurer chat. `variant="assistant"` is the payment assistant: same
- * AI and tools, framed around getting a payout requested or funds added.
+ * The one AI chat, opened from the floating Ask button: answers questions about
+ * the money, and prepares payout requests and contributions for the person to
+ * confirm. It can't approve or move money.
  */
 export function TreasurerPanel({
   collectiveId,
   kind,
   currency,
   brief,
-  variant = 'treasurer',
+  onClose,
 }: {
   collectiveId: string
   kind: string
   currency: string
   brief: string
-  variant?: 'treasurer' | 'assistant'
+  onClose: () => void
 }) {
-  const assistant = variant === 'assistant'
-  const [minimized, setMinimized] = useState(false)
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
@@ -112,28 +111,28 @@ export function TreasurerPanel({
   }
 
   return (
-    <section className={`treasurer-card overflow-hidden rounded-[16px] border ${assistant ? '' : 'mt-6'}`}>
-      <div className={`flex flex-wrap items-start justify-between gap-3 px-5 pt-5 ${minimized ? 'pb-5' : ''}`}>
+    <section className="treasurer-card flex h-full flex-col overflow-hidden rounded-[16px] border shadow-[0_16px_48px_rgba(0,0,0,0.18)]">
+      <div className="flex items-start justify-between gap-3 px-5 pt-5">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet text-white shadow-[0_4px_14px_rgba(109,74,255,0.35)]">
             <Sparkles size={17} />
           </span>
           <div>
-            <div className="font-semibold tracking-tight">{assistant ? 'Payment assistant' : 'AI Treasurer'}</div>
-            <div className="text-xs text-muted">
-              {assistant ? 'Tell it what you need. It asks for the details and gets it ready; you confirm.' : 'Reads the ledger and drafts requests. Can’t approve or move money.'}
-            </div>
+            <div className="font-semibold tracking-tight">AI Treasurer</div>
+            <div className="text-xs text-muted">Ask about the money, request a payout or add funds. It can’t approve or move money.</div>
           </div>
         </div>
-        <span className="pill pill-violet">
-          <span className="h-1.5 w-1.5 rounded-full bg-violet animate-pulse" /> Watching the ledger
-        </span>
-        <MinimizeButton open={!minimized} onToggle={() => setMinimized(!minimized)} label={assistant ? 'payment assistant' : 'AI Treasurer'} />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-white/70 hover:text-ink"
+        >
+          <X size={16} />
+        </button>
       </div>
-      {!minimized && (
-        <>
 
-      <div ref={scrollRef} className="max-h-[420px] overflow-y-auto px-5 pt-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">
         {turns.length === 0 ? (
           <p className="rounded-xl bg-white/70 px-4 py-3 text-sm leading-relaxed text-ink/80 ring-1 ring-violet/10">
             <Rich text={brief} />
@@ -175,8 +174,8 @@ export function TreasurerPanel({
 
       <div className="px-5 pb-5 pt-4">
         {turns.length === 0 && (
-          <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto">
-            {(assistant ? ASSISTANT_SUGGESTIONS : (SUGGESTIONS[kind] ?? DEFAULT_SUGGESTIONS)).map((s) => (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {[...(SUGGESTIONS[kind] ?? DEFAULT_SUGGESTIONS).slice(0, 2), ...ACTION_SUGGESTIONS].map((s) => (
               <button
                 key={s}
                 onClick={() => ask(s)}
@@ -198,7 +197,7 @@ export function TreasurerPanel({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={assistant ? 'e.g. Pay Maya Thompson $120 for textbooks…' : 'Ask the Treasurer about the money…'}
+            placeholder="Ask a question, or say what you need…"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
           />
           <button
@@ -214,8 +213,6 @@ export function TreasurerPanel({
           <Lock size={11} /> Private to you and not saved. Other members only see what you submit or pay.
         </p>
       </div>
-        </>
-      )}
     </section>
   )
 }
