@@ -239,7 +239,6 @@ async function CollectiveContent({
         viewerId={viewer.id}
         viewerRole={viewer.role}
         exit={exit}
-        outsideCheck={{ enabled: ownAccount, lastAt: collective.lastReconciledAt?.toISOString() ?? null, since: collective.paypalMonitorSince?.toISOString() ?? null }}
         exitPolicy={collective.exitPolicy}
         maxMembers={collective.maxMembers}
         inviteCode={viewer.role === 'ADMIN' ? collective.inviteCode : null}
