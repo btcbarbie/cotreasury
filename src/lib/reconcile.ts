@@ -1,7 +1,7 @@
 import { prisma } from './prisma'
 import { recordEvent } from './audit'
 import { formatMoney } from './money'
-import { hasOwnAccount, searchTransactions, type AccountTransaction } from './paypal'
+import { searchTransactions, type AccountTransaction } from './paypal'
 
 // The outside-activity check. CoTreasury only moves money through its own
 // governed flows, but whoever owns the PayPal login could also act directly in
@@ -12,6 +12,7 @@ import { hasOwnAccount, searchTransactions, type AccountTransaction } from './pa
 const MIN_INTERVAL_MS = 2 * 60 * 1000
 const WINDOW_MS = 31 * 24 * 60 * 60 * 1000 // PayPal's maximum search range
 const DAY = 24 * 60 * 60 * 1000
+const NEW_TREASURY_MS = 3 * DAY
 
 /**
  * PayPal event codes that move money: T00xx payments sent or received, T03xx
@@ -34,19 +35,23 @@ export type ReconcileResult = { checked: boolean; flagged: number; reason?: stri
 export async function reconcile(collectiveId: string, { force = false } = {}): Promise<ReconcileResult> {
   const c = await prisma.collective.findUnique({
     where: { id: collectiveId },
-    select: { id: true, currency: true, paypalAccount: true, paypalMonitorSince: true, lastReconciledAt: true },
+    select: { id: true, currency: true, paypalAccount: true, paypalMonitorSince: true, lastReconciledAt: true, createdAt: true },
   })
   if (!c) return { checked: false, flagged: 0, reason: 'not found' }
-  // A shared account mixes several groups' money, so only a group's own account can be checked.
-  if (!hasOwnAccount(c.paypalAccount)) return { checked: false, flagged: 0, reason: 'shared account' }
+  // Groups without their own keys use the shared account; it's checked too, so
+  // every treasury on it sees money moved there outside CoTreasury.
   const now = new Date()
   if (!force && c.lastReconciledAt && now.getTime() - c.lastReconciledAt.getTime() < MIN_INTERVAL_MS) {
     return { checked: false, flagged: 0, reason: 'checked recently' }
   }
-  // First run: start watching from now. What happened before is the account's past.
+  // First run: a new treasury is watched from the moment it was created; an
+  // older one from now (what happened before is the account's past).
   if (!c.paypalMonitorSince) {
-    await prisma.collective.update({ where: { id: c.id }, data: { paypalMonitorSince: now, lastReconciledAt: now } })
-    return { checked: true, flagged: 0 }
+    const isNew = now.getTime() - c.createdAt.getTime() < NEW_TREASURY_MS
+    c.paypalMonitorSince = isNew ? c.createdAt : now
+    await prisma.collective.update({ where: { id: c.id }, data: { paypalMonitorSince: c.paypalMonitorSince, lastReconciledAt: now } })
+    if (!isNew) return { checked: true, flagged: 0 }
+    c.lastReconciledAt = now
   }
   // Claim this run so two page loads don't both check.
   const claimed = await prisma.collective.updateMany({
@@ -75,10 +80,22 @@ export async function reconcile(collectiveId: string, { force = false } = {}): P
   // Older payouts may not have PayPal's transaction id yet: match those by amount and date.
   const unlinkedPayouts = entries.filter((e) => e.type === 'PAYOUT' && !e.paypalTxnId)
 
+  // When the account is short, PayPal tops it up from the linked bank (T03xx)
+  // to fund a payment in the same moment. That top-up is part of the payment,
+  // not a separate movement, so only the payment itself is shown.
+  const cents = (t: AccountTransaction['transaction_info']) => Math.round(parseFloat(t.transaction_amount.value) * 100)
+  const fundsAPayment = (t: AccountTransaction['transaction_info']) =>
+    t.transaction_event_code.startsWith('T03') &&
+    history.some(({ transaction_info: o }) =>
+      o.transaction_event_code.startsWith('T00') &&
+      cents(o) === -cents(t) &&
+      Math.abs(new Date(o.transaction_initiation_date).getTime() - new Date(t.transaction_initiation_date).getTime()) < 5 * 60 * 1000,
+    )
+
   let flagged = 0
   for (const { transaction_info: t, payer_info } of history) {
     if (!movesMoney(t.transaction_event_code) || !['S', 'P'].includes(t.transaction_status)) continue
-    if (known.has(t.transaction_id)) continue
+    if (known.has(t.transaction_id) || fundsAPayment(t)) continue
     const value = parseFloat(t.transaction_amount.value)
     const cents = Math.round(Math.abs(value) * 100)
     const at = new Date(t.transaction_initiation_date)
