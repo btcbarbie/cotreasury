@@ -14,6 +14,7 @@ type Proposal = {
   amountCents: number
   requiredApprovals: number
   status: string
+  createdAt: string
   wontPass: boolean
   proposedById: string | null
   approvals: { memberId: string; decision: string }[]
@@ -23,7 +24,7 @@ type Proposal = {
 }
 type Entry = { id: string; type: string; status: string; amountCents: number; counterparty: string | null; createdAt: string }
 
-export type AttentionItem = { key: string; group: string; tone: string; Icon: typeof Clock; title: string; detail: string; action?: 'requests' }
+export type AttentionItem = { key: string; group: string; tone: string; Icon: typeof Clock; title: string; detail: string; action?: 'requests'; at: string }
 
 /** Everything in the treasury that is waiting on a person (or on PayPal), with the reason. */
 export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goals: GoalProgress[]; viewerId: string; viewerRole: string; currency: string }): AttentionItem[] {
@@ -38,6 +39,7 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
       const mine = x.panel ? x.panel.canVote : isApprover && x.proposedById !== p.viewerId && !x.approvals.some((a) => a.memberId === p.viewerId)
       items.push({
         key: `p-${x.id}`,
+        at: x.createdAt,
         group: 'Needs approval',
         tone: x.wontPass ? 'text-red bg-red-soft' : mine ? 'text-amber bg-amber-soft' : 'text-muted bg-bg',
         Icon: x.kind === 'RULE_CHANGE' ? Scale : mine ? UserCheck : Hourglass,
@@ -53,15 +55,16 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
       })
     }
     if (x.status === 'EXECUTING') {
-      items.push({ key: `e-${x.id}`, group: 'Being paid out', tone: 'text-blue bg-blue-soft', Icon: Send, title: label, detail: 'PayPal is sending this payout. Each recipient updates when PayPal confirms.', action: 'requests' })
+      items.push({ key: `e-${x.id}`, at: x.createdAt, group: 'Being paid out', tone: 'text-blue bg-blue-soft', Icon: Send, title: label, detail: 'PayPal is sending this payout. Each recipient updates when PayPal confirms.', action: 'requests' })
     }
     if (x.status === 'FAILED') {
-      items.push({ key: `f-${x.id}`, group: 'Problems', tone: 'text-red bg-red-soft', Icon: AlertTriangle, title: label, detail: x.failureReason ?? 'The payout failed.', action: 'requests' })
+      items.push({ key: `f-${x.id}`, at: x.createdAt, group: 'Problems', tone: 'text-red bg-red-soft', Icon: AlertTriangle, title: label, detail: x.failureReason ?? 'The payout failed.', action: 'requests' })
     }
     for (const r of x.recipients) {
       if (r.status === 'RETURNED') {
         items.push({
           key: `r-${x.id}-${r.receiver}`,
+          at: x.createdAt,
           group: 'Problems',
           tone: 'text-red bg-red-soft',
           Icon: AlertTriangle,
@@ -72,6 +75,7 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
       if (r.status === 'UNCLAIMED') {
         items.push({
           key: `u-${x.id}-${r.receiver}`,
+          at: x.createdAt,
           group: 'Problems',
           tone: 'text-amber bg-amber-soft',
           Icon: Clock,
@@ -86,6 +90,7 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
   for (const e of p.entries.filter((x) => x.type === 'UNAPPROVED_MOVEMENT')) {
     items.push({
       key: `um-${e.id}`,
+      at: e.createdAt,
       group: 'Problems',
       tone: 'text-amber bg-amber-soft',
       Icon: AlertTriangle,
@@ -94,7 +99,23 @@ export function attentionItems(p: { proposals: Proposal[]; entries: Entry[]; goa
     })
   }
 
-  return items
+  // Newest first.
+  return items.sort((a, b) => b.at.localeCompare(a.at))
+}
+
+/** One notice on its own (used when notices and request cards share one list, newest first). */
+export function AttentionRow({ item: i }: { item: AttentionItem }) {
+  return (
+    <div className="card flex items-start gap-3 px-4 py-3.5">
+      <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${i.tone}`}>
+        <i.Icon size={15} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">{i.title}</div>
+        <div className="mt-0.5 text-sm text-muted">{i.detail}</div>
+      </div>
+    </div>
+  )
 }
 
 const ORDER = ['Needs approval', 'Being paid out', 'Problems']

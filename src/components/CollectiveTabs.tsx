@@ -11,7 +11,7 @@ import { AddMemberButton, TreasuryDetailsCard } from './SettingsPanels'
 import { ExitPanel, type ExitInfo } from './ExitPanel'
 import { OverviewPanel } from './OverviewPanel'
 import { CollapsibleSection, MinimizeButton } from './Collapsible'
-import { AttentionPanel, attentionItems } from './AttentionPanel'
+import { AttentionPanel, AttentionRow, attentionItems } from './AttentionPanel'
 import { ActivityPanel, type ActivityEvent } from './ActivityPanel'
 import type { GoalProgress } from '@/lib/goals'
 import type { LedgerRow } from './LedgerGrid'
@@ -143,17 +143,22 @@ export function CollectiveTabs(props: {
             <CollapsibleSection title="Needs attention" count={needsCount || undefined}>
               <div className="grid gap-3">
                 {live.length === 0 && otherItems.length === 0 && <AttentionPanel items={[]} onOpenRequests={() => {}} />}
-                {live.map((p) => (
-                  <RequestCard
-                    key={p.id}
-                    p={p}
-                    currency={props.currency}
-                    viewerId={props.viewerId}
-                    viewerRole={props.viewerRole}
-                    approvers={props.members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN')}
-                  />
-                ))}
-                {otherItems.length > 0 && <AttentionPanel items={otherItems} onOpenRequests={() => {}} />}
+                {/* Requests and notices in one list, newest first. */}
+                {[
+                  ...live.map((p) => ({ at: p.createdAt, key: p.id, node: (
+                    <RequestCard
+                      key={p.id}
+                      p={p}
+                      currency={props.currency}
+                      viewerId={props.viewerId}
+                      viewerRole={props.viewerRole}
+                      approvers={props.members.filter((m) => m.role === 'APPROVER' || m.role === 'ADMIN')}
+                    />
+                  ) })),
+                  ...otherItems.map((i) => ({ at: i.at, key: i.key, node: <AttentionRow key={i.key} item={i} /> })),
+                ]
+                  .sort((a, b) => b.at.localeCompare(a.at))
+                  .map((x) => x.node)}
               </div>
             </CollapsibleSection>
           </div>
