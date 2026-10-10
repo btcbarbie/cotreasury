@@ -140,7 +140,8 @@ function StatusCell({ r }: { r: Row }) {
     )
   }
   const pill =
-    r.status === 'CONFIRMED' ? { cls: 'pill-green', label: r.source === 'IMPORTED' ? 'Recorded' : 'Verified' } : r.status === 'FAILED' ? { cls: 'pill-red', label: 'Failed' } : { cls: 'pill-amber', label: 'Pending' }
+    // Same colour as the amount: money in green, money out blue.
+    r.status === 'CONFIRMED' ? { cls: r.direction === 'IN' ? 'pill-green' : 'pill-blue', label: r.source === 'IMPORTED' ? 'Recorded' : 'Verified' } : r.status === 'FAILED' ? { cls: 'pill-red', label: 'Failed' } : { cls: 'pill-amber', label: 'Pending' }
   let line: string | null
   if (r.source === 'IMPORTED') line = null
   else if (r.type === 'PAYOUT') {
