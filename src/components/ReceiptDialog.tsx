@@ -119,16 +119,20 @@ export function ReceiptDialog({
             </p>
           </>
         )}
-        <button
-          type="button"
-          className="mt-4 inline-flex items-center gap-1.5 text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
-          onClick={() => {
-            onClose()
-            openAsk(askPrompt)
-          }}
-        >
-          <Sparkles size={12} /> Ask about this payment
-        </button>
+        {/* Kept apart from PayPal's data: this part is CoTreasury's, not PayPal's. */}
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-line pt-3 text-xs text-muted">
+          <span>CoTreasury · not part of PayPal&apos;s record</span>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 underline-offset-2 hover:text-ink hover:underline"
+            onClick={() => {
+              onClose()
+              openAsk(askPrompt)
+            }}
+          >
+            <Sparkles size={12} /> Ask about this payment
+          </button>
+        </div>
       </div>
     </div>
   )
