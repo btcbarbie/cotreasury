@@ -123,13 +123,11 @@ export function RulesPanel({
           <div className="flex items-start justify-between gap-4 py-3 text-sm">
             <span>
               {approvalMode === 'FIXED' ? 'Approvers' : 'Named approvers'}
-              <span className="block text-xs text-muted">
-                {approvalMode === 'FIXED'
-                  ? 'Chosen by the group, not by who contributes most.'
-                  : approvalMode === 'MIXED'
-                    ? 'One of them sits on each payout panel. They also approve rule changes.'
-                    : 'They approve rule changes only. Payouts go to the random panel.'}
-              </span>
+              {approvalMode !== 'FIXED' && (
+                <span className="block text-xs text-muted">
+                  {approvalMode === 'MIXED' ? 'One of them sits on each payout panel. They also approve rule changes.' : 'They approve rule changes only. Payouts go to the random panel.'}
+                </span>
+              )}
             </span>
             <span className="flex flex-wrap justify-end gap-1.5">
               {approvers.map((m) => (
