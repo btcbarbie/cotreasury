@@ -68,14 +68,13 @@ export function ActivityPanel({ collectiveId, events }: { collectiveId: string; 
 
   return (
     <div className="grid gap-4">
-      <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
-        <div className="max-w-xl">
-          <div className="font-medium">Every action, sealed in order</div>
-          <p className="mt-1 text-sm text-muted">
-            Each event is fingerprinted together with the one before it. If anyone edits or deletes past history, the integrity check fails, including for the people who run CoTreasury.
-          </p>
-        </div>
-        <button className="btn btn-primary" onClick={() => start(async () => setResult(await checkIntegrity(collectiveId)))} disabled={pending}>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <button
+          className="btn btn-ghost !h-8"
+          onClick={() => start(async () => setResult(await checkIntegrity(collectiveId)))}
+          disabled={pending}
+          title="Confirms no past event was edited or deleted"
+        >
           {pending ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Check integrity
         </button>
         {result &&
