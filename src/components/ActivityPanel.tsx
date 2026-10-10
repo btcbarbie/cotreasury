@@ -9,6 +9,27 @@ export type ActivityEvent = { id: string; seq: number; actor: string; action: st
 
 type Check = Awaited<ReturnType<typeof checkIntegrity>>
 
+/**
+ * Plain-language version of an event, for display only: the sealed text is
+ * never changed (the integrity check depends on it).
+ */
+function readable(e: ActivityEvent) {
+  const text = e.summary.replace(/\s*\(imported record\)/g, '').replace(/\$([\d,]+)\.00\b/g, '$$$1')
+  if (e.action === 'CONTRIBUTION_IMPORTED') {
+    const m = text.match(/^paid (\$[\d,.]+)(?: \((.+)\))?$/)
+    if (m) return `paid ${m[1]} to the treasury${m[2] && m[2] !== 'Member contribution' ? ` · ${m[2]}` : ''}`
+  }
+  if (e.action === 'PAYOUT_IMPORTED') {
+    const m = text.match(/^paid out (\$[\d,.]+) to (.+?): (.+)$/)
+    if (m) return `paid ${m[1]} from the treasury to ${m[2]} for ${m[3]}`
+  }
+  if (e.action === 'OPENING_BALANCE_IMPORTED') {
+    const m = text.match(/opening balance of (\$[\d,.]+)/)
+    if (m) return `carried over an opening balance of ${m[1]}`
+  }
+  return text
+}
+
 function ActorMark({ actor }: { actor: string }) {
   if (actor === 'PayPal')
     return <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-soft text-[10px] font-bold text-blue">PP</span>
@@ -62,8 +83,7 @@ export function ActivityPanel({ collectiveId, events }: { collectiveId: string; 
             <ActorMark actor={e.actor} />
             <div className="min-w-0 flex-1">
               <div className="text-sm">
-                {/* Display only: the sealed text keeps "(imported record)"; the demo context already says it. */}
-                <span className="font-medium">{e.actor}</span> {e.summary.replace(/\s*\(imported record\)/g, '')}
+                <span className="font-medium">{e.actor}</span> {readable(e)}
               </div>
               <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-faint">
                 <span>
