@@ -161,7 +161,7 @@ export function CollectiveTabs(props: {
         {tab === 'Activity log' && (
           <div className="grid gap-10">
             <CollapsibleSection title="Every action" count={props.events.length}>
-              <ActivityPanel collectiveId={props.collectiveId} events={props.events} />
+              <ActivityPanel events={props.events} />
             </CollapsibleSection>
           </div>
         )}
