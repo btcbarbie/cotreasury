@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useImperativeHandle, useRef, useState, useTransition, type Ref } from 'react'
-import { AlertTriangle, ArrowUp, Check, FileText, HandCoins, Loader2, Lock, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowUp, Check, FileText, HandCoins, Loader2, Lock, Sparkles, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { submitRequest } from '@/app/c/[id]/actions'
 import type { ContributionDraft, DraftRequest, TreasurerReply } from '@/lib/treasurer'
@@ -79,6 +79,8 @@ export function TreasurerPanel({
   const [thinking, setThinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Bumped by Back: an answer for a conversation you've left is ignored.
+  const conversation = useRef(0)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -87,6 +89,7 @@ export function TreasurerPanel({
   async function ask(question: string) {
     const q = question.trim()
     if (!q || thinking) return
+    const id = conversation.current
     const next: Turn[] = [...turns, { role: 'user', content: q }]
     setTurns(next)
     setInput('')
@@ -99,14 +102,24 @@ export function TreasurerPanel({
         body: JSON.stringify({ history: next.map((t) => ({ role: t.role, content: t.content })) }),
       })
       const data = await res.json()
+      if (id !== conversation.current) return
       if (!res.ok) throw new Error(data.error ?? 'The Treasurer is unavailable.')
       const reply = data as TreasurerReply
       setTurns([...next, { role: 'assistant', content: reply.answer, checks: reply.checks, draft: reply.draft, contribution: reply.contribution }])
     } catch (e) {
-      setError((e as Error).message)
+      if (id === conversation.current) setError((e as Error).message)
     } finally {
-      setThinking(false)
+      if (id === conversation.current) setThinking(false)
     }
+  }
+
+  /** Leave this conversation but keep the chat open, back at its start. */
+  function back() {
+    conversation.current++
+    setTurns([])
+    setInput('')
+    setError(null)
+    setThinking(false)
   }
   useImperativeHandle(ref, () => ({ ask }))
 
@@ -127,6 +140,16 @@ export function TreasurerPanel({
             <div className="text-xs text-muted">Ask about the money, request a payout or add funds. It can’t approve or move money.</div>
           </div>
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+        {(turns.length > 0 || thinking) && (
+          <button
+            type="button"
+            onClick={back}
+            className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-muted transition hover:bg-white/70 hover:text-ink"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -135,6 +158,7 @@ export function TreasurerPanel({
         >
           <X size={16} />
         </button>
+        </div>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-4">
