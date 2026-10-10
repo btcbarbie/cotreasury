@@ -4,7 +4,7 @@ import { formatMoney } from './money'
 import { createPayoutBatch, getPayoutBatch, PayPalError, type PayoutItem } from './paypal'
 import { recordEvent } from './audit'
 import { receiverLabel } from './recipients'
-import { markClosed } from './exit'
+import { completeLeave, markClosed } from './exit'
 
 /** Proposals that pay people through PayPal Payouts. */
 export const PAYOUT_KINDS = ['SPEND', 'REFUND', 'CLOSE']
@@ -170,6 +170,7 @@ async function finalize(proposalId: string) {
   if (p.recipients.some((r) => r.status === 'SENT' || r.status === 'PENDING')) return
   const failed = p.recipients.filter((r) => r.status === 'FAILED' || r.status === 'RETURNED')
   if (failed.length === 0 && p.kind === 'CLOSE') await markClosed(p.collectiveId)
+  if (failed.length === 0 && p.kind === 'REFUND') await completeLeave(p.id)
   await prisma.proposal.update({
     where: { id: p.id },
     data:

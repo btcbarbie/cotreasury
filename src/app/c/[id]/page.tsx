@@ -61,6 +61,12 @@ async function CollectiveContent({
     openPayouts: collective.proposals.filter((p) => ['SPEND', 'REFUND'].includes(p.kind) && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(p.status)).length,
     rulePending: collective.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL'),
     me: { contributedCents: myShare?.contributedCents ?? 0, shareCents: myShare?.shareCents ?? 0 },
+    meLeaving: viewer.leaving,
+    rejectedRefund: (() => {
+      const last = collective.proposals.find((p) => p.kind === 'REFUND' && p.proposedById === viewer.id)
+      return last && last.status === 'REJECTED' && !viewer.leaving ? { amountCents: last.amountCents, at: last.createdAt.toISOString() } : null
+    })(),
+    myRefundCents: collective.proposals.find((p) => p.kind === 'REFUND' && p.proposedById === viewer.id && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'FAILED'].includes(p.status))?.amountCents ?? 0,
     closeShares: fairShares(collective.members, collective.entries, treasury.availableCents, true).map(({ memberId, name, contributedCents, shareCents }) => ({ memberId, name, contributedCents, shareCents })),
   }
   const cur = collective.currency
@@ -248,7 +254,7 @@ async function CollectiveContent({
         exitPolicy={collective.exitPolicy}
         maxMembers={collective.maxMembers}
         inviteCode={viewer.role === 'ADMIN' ? collective.inviteCode : null}
-        members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role }))}
+        members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role, leaving: m.leaving }))}
         tiers={collective.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals }))}
         entries={collective.entries.map((e) => {
           const goal = e.goalId ? collective.goals.find((g) => g.id === e.goalId) : null

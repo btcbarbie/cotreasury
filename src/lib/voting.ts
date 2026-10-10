@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { recordEvent } from './audit'
 import { revealPanel, REVIEW_WINDOW_HOURS } from './panel'
+import { cancelLeave } from './exit'
 import { canApprove } from './treasury'
 
 // A "no" never ends the vote on its own. A request is approved as soon as it
@@ -33,6 +34,7 @@ export async function closeRejected(tx: Prisma.TransactionClient, proposalId: st
   const yes = p.approvals.filter((a) => a.decision === 'APPROVE').length
   const no = p.approvals.length - yes
   await revealPanel(tx, proposalId)
+  await cancelLeave(tx, proposalId)
   await recordEvent(
     p.collectiveId,
     {

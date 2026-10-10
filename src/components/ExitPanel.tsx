@@ -16,6 +16,11 @@ export type ExitInfo = {
   openPayouts: number
   rulePending: boolean
   me: { contributedCents: number; shareCents: number }
+  /** The viewer asked to leave and their refund is waiting for approval or payment. */
+  meLeaving: boolean
+  myRefundCents: number
+  /** The viewer's most recent refund request was rejected (they're still a member). */
+  rejectedRefund: { amountCents: number; at: string } | null
   closeShares: { memberId: string; name: string; contributedCents: number; shareCents: number }[]
 }
 
@@ -35,10 +40,14 @@ export function ExitPanel({ collectiveId, currency, viewerRole, exit }: { collec
         <p className="mt-2 text-xs text-muted">The group can change this with a rule change. CoTreasury does the maths from the ledger; people approve every payout.</p>
         {exit.lock ? (
           <div className="mt-4 rounded-lg bg-bg px-3 py-2 text-sm text-muted">{exit.lock}</div>
+        ) : exit.meLeaving ? (
+          <div className="mt-4 rounded-lg bg-amber-soft px-3 py-2 text-sm text-amber">
+            You’ve asked to leave. Your {m(exit.myRefundCents)} refund is waiting for the group to approve and pay it. You stay a member until then; if it’s rejected, you simply stay.
+          </div>
         ) : viewerRole === 'ADMIN' ? (
           <div className="mt-4 rounded-lg bg-bg px-3 py-2 text-sm text-muted">As the admin you can’t leave. To end the group, propose closing the treasury.</div>
         ) : (
-          <LeaveForm collectiveId={collectiveId} policy={exit.policy} me={exit.me} availableCents={exit.availableCents} m={m} />
+          <LeaveForm collectiveId={collectiveId} policy={exit.policy} me={exit.me} availableCents={exit.availableCents} m={m} rejected={exit.rejectedRefund} />
         )}
       </div>
 
@@ -72,12 +81,14 @@ function LeaveForm({
   me,
   availableCents,
   m,
+  rejected,
 }: {
   collectiveId: string
   policy: string
   me: ExitInfo['me']
   availableCents: number
   m: (c: number) => string
+  rejected: ExitInfo['rejectedRefund']
 }) {
   const [confirming, setConfirming] = useState(false)
   const [amount, setAmount] = useState((me.shareCents / 100).toFixed(2))
@@ -93,9 +104,29 @@ function LeaveForm({
     })
   }
 
+  function leaveWithoutRefund() {
+    setError(null)
+    start(async () => {
+      const r = await leaveTreasury(collectiveId, { waiveRefund: true })
+      if (!r.ok) setError(r.error)
+    })
+  }
+
   return (
     <div className="mt-4 rounded-xl border border-line p-4 text-sm">
-      <div className="font-medium">Leave the treasury</div>
+      {rejected && (
+        <div className="mb-3 rounded-lg bg-amber-soft px-3 py-2 text-amber">
+          The group rejected your {m(rejected.amountCents)} refund on {new Date(rejected.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. You’re still a member. If
+          you still want to leave, you can ask again, or leave without a refund and take it up with PayPal: your contributions and this decision are recorded in the ledger and
+          the sealed activity log.
+          <div className="mt-2">
+            <button className="btn btn-ghost !h-8 bg-white" onClick={leaveWithoutRefund} disabled={pending}>
+              <LogOut size={14} /> Leave without a refund
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="font-medium">{rejected ? 'Ask again' : 'Leave the treasury'}</div>
       <p className="mt-1 text-muted">
         You’ve put in <span className="font-medium text-ink">{m(me.contributedCents)}</span>.{' '}
         {policy === 'UNSPENT_SHARE' &&

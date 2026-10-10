@@ -116,7 +116,7 @@ async function createPayoutProposal(
  * Leave the group. Nobody can be made to stay, so this needs no vote. Any
  * refund follows the group's exit policy and is approved like any payout.
  */
-export async function leaveTreasury(collectiveId: string, input: { refundCents?: number } = {}): Promise<Result> {
+export async function leaveTreasury(collectiveId: string, input: { refundCents?: number; waiveRefund?: boolean } = {}): Promise<Result> {
   const viewer = await getViewer(collectiveId)
   if (!viewer) return { ok: false, error: 'Not a member of this collective.' }
   if (viewer.role === 'ADMIN') return { ok: false, error: 'The admin can’t leave. To end the group, propose closing the treasury.' }
@@ -135,43 +135,69 @@ export async function leaveTreasury(collectiveId: string, input: { refundCents?:
     if (left < needed) return { ok: false, error: `The rules need ${needed} approvers. Ask the group to add another approver before you leave.` }
   }
 
-  const available = computeTreasury(c.entries, c.proposals).availableCents
-  const mine = fairShares(c.members, c.entries, available).find((s) => s.memberId === viewer.id)!
+  // Refunds already waiting for approval are set aside, and those members
+  // aren't counted again, so two people leaving never share the same money.
+  const pendingRefunds = c.proposals.filter((p) => p.kind === 'REFUND' && ['PENDING_APPROVAL', 'APPROVED', 'EXECUTING'].includes(p.status))
+  const available = computeTreasury(c.entries, c.proposals).availableCents - pendingRefunds.filter((p) => p.status === 'PENDING_APPROVAL').reduce((s, p) => s + p.amountCents, 0)
+  const staying = c.members.filter((m) => !m.leaving || m.id === viewer.id)
+  const mine = fairShares(staying, c.entries, available).find((s) => s.memberId === viewer.id)!
   const policy = c.exitPolicy as ExitPolicy
-  const refundCents =
-    policy === 'UNSPENT_SHARE'
+  const refundCents = input.waiveRefund
+    ? 0
+    : policy === 'UNSPENT_SHARE'
       ? mine.shareCents
       : policy === 'VOTE'
         ? Math.max(0, Math.min(Math.round(input.refundCents ?? mine.shareCents), mine.contributedCents, available))
         : 0
 
-  await prisma.$transaction(async (tx) => {
-    await tx.member.update({ where: { id: viewer.id }, data: { role: 'FORMER' } })
-    // Their panel seats are re-drawn the next time anyone opens the treasury.
-    await tx.proposalReviewer.updateMany({ where: { memberId: viewer.id, status: 'ACTIVE' }, data: { expiresAt: new Date() } })
-    await recordEvent(
-      collectiveId,
-      {
-        actor: viewer.name,
-        action: 'MEMBER_LEFT',
-        summary: `left the group${refundCents > 0 ? `; a ${formatMoney(refundCents, c.currency, { cents: true })} refund goes to the group for approval` : policy === 'NO_REFUNDS' ? ' (no refunds: contributions stay with the cause)' : ''}`,
-        data: { memberId: viewer.id, policy, refundCents, contributedCents: mine.contributedCents },
-      },
-      tx,
-    )
-  })
-
-  if (refundCents > 0) {
+  if (refundCents === 0) {
+    // Nothing to pay back: they leave straight away.
+    await prisma.$transaction(async (tx) => {
+      await tx.member.update({ where: { id: viewer.id }, data: { role: 'FORMER', leaving: false } })
+      // Their panel seats are re-drawn the next time anyone opens the treasury.
+      await tx.proposalReviewer.updateMany({ where: { memberId: viewer.id, status: 'ACTIVE' }, data: { expiresAt: new Date() } })
+      await recordEvent(
+        collectiveId,
+        {
+          actor: viewer.name,
+          action: 'MEMBER_LEFT',
+          summary: input.waiveRefund
+            ? 'left the group without a refund after the group rejected it. Their contributions and that decision stay on the record'
+            : `left the group${policy === 'NO_REFUNDS' ? ' (no refunds: contributions stay with the cause)' : ''}`,
+          data: { memberId: viewer.id, policy, refundCents, contributedCents: mine.contributedCents },
+        },
+        tx,
+      )
+    })
+  } else {
+    // A refund first: they stay a member until it's approved and paid. If the
+    // group rejects it, they simply stay.
+    await prisma.$transaction(async (tx) => {
+      await tx.member.update({ where: { id: viewer.id }, data: { leaving: true } })
+      await recordEvent(
+        collectiveId,
+        {
+          actor: viewer.name,
+          action: 'MEMBER_LEAVING',
+          summary: `asked to leave the group with a ${formatMoney(refundCents, c.currency, { cents: true })} refund; they stay a member until the group approves and pays it`,
+          data: { memberId: viewer.id, policy, refundCents, contributedCents: mine.contributedCents },
+        },
+        tx,
+      )
+    })
     const r = await createPayoutProposal(collectiveId, viewer, {
       kind: 'REFUND',
-      title: `Refund for ${viewer.name} (left the group)`,
+      title: `Refund for ${viewer.name} (leaving the group)`,
       description:
         policy === 'UNSPENT_SHARE'
           ? `${viewer.name} put in ${formatMoney(mine.contributedCents, c.currency)}. Their share of the ${formatMoney(available, c.currency)} left is ${formatMoney(refundCents, c.currency, { cents: true })}, in proportion to what they contributed.`
           : `${viewer.name} asked for ${formatMoney(refundCents, c.currency, { cents: true })} back. They put in ${formatMoney(mine.contributedCents, c.currency)}; their proportional share of what's left would be ${formatMoney(mine.shareCents, c.currency, { cents: true })}.`,
       recipients: [{ name: viewer.name, receiver: viewer.email, receiverType: 'EMAIL', amountCents: refundCents }],
     })
-    if (!r.ok) return r
+    if (!r.ok) {
+      await prisma.member.update({ where: { id: viewer.id }, data: { leaving: false } })
+      return r
+    }
   }
   refresh()
   return { ok: true }

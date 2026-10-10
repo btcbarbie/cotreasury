@@ -23,7 +23,7 @@ const LedgerGrid = dynamic(() => import('./LedgerGrid').then((m) => m.LedgerGrid
   loading: () => <div className="h-[520px] animate-pulse bg-bg" />,
 })
 
-type Member = { id: string; name: string; email: string; role: string }
+type Member = { id: string; name: string; email: string; role: string; leaving?: boolean }
 type Tier = { minCents: number; maxCents: number | null; requiredApprovals: number }
 type Proposal = {
   id: string
@@ -508,6 +508,7 @@ function MembersPanel({ members }: { members: Member[] }) {
             <div className="truncate text-sm font-medium">{m.name}</div>
             <div className="truncate text-xs text-muted">{m.email}</div>
           </div>
+          {m.leaving && <span className="pill pill-amber">Leaving · refund pending</span>}
           <RoleBadge role={m.role} />
         </div>
       ))}

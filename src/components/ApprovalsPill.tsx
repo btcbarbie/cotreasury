@@ -107,7 +107,7 @@ function ApprovalItem({ p, currency }: { p: PendingApproval; currency: string })
             {p.kind === 'CLOSE'
               ? 'Final settlement, paid from the group’s account:'
               : p.kind === 'REFUND'
-                ? `${p.requestedBy ?? 'A member'} left the group. Refund, from the group’s account:`
+                ? `${p.requestedBy ?? 'A member'} wants to leave the group. Refund, from the group’s account:`
                 : `${p.requestedBy ?? 'Someone'} wants to pay, from the group’s account:`}
           </div>
           <ul className="mt-1.5 grid gap-1 text-sm">

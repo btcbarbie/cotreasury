@@ -67,6 +67,8 @@ model Member {
   role         String   @default("MEMBER") // "MEMBER" | "APPROVER" | "ADMIN"
   // Notifications: the activity-log sequence number this member has seen up to.
   lastSeenSeq  Int      @default(0)
+  // Asked to leave with a refund: still a member until the refund is paid; back to normal if it's rejected.
+  leaving     Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   collective   Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
