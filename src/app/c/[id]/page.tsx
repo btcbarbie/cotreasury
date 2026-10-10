@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { connection } from 'next/server'
 import Link from 'next/link'
-import { Archive, ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark } from 'lucide-react'
+import { Archive, ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark, Wallet } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
@@ -133,17 +133,23 @@ async function CollectiveContent({
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">{collective.name}</h1>
           <p className="mt-1.5 max-w-2xl text-muted">{collective.purpose}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <span className="pill pill-green">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> PayPal sandbox account
+          {/* The account that really holds the money, as reported by PayPal, not a label we typed in. */}
+          <div className="mt-4 inline-flex max-w-full items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-soft text-blue">
+              <Wallet size={15} />
             </span>
-            {/* The account that really holds the money, as reported by PayPal, not a label we typed in. */}
-            <span className="truncate font-mono text-xs text-ink/80" title={account.merchantId ? `PayPal merchant ID ${account.merchantId}` : undefined}>
-              {account.email ?? 'PayPal sandbox business account'}
-            </span>
-            <span className="text-xs text-muted">
-              {ownAccount ? '· this group’s own PayPal business account' : '· shared by treasuries without their own account; in real use each group connects its own'}
-            </span>
+            <div className="min-w-0 leading-tight">
+              <div
+                className="flex items-center gap-2 text-sm font-medium"
+                title={ownAccount ? 'This group’s own PayPal business account' : 'Shared by treasuries without their own account. In real use each group connects its own.'}
+              >
+                {ownAccount ? 'Group PayPal account' : 'Shared PayPal account'}
+                <span className="pill pill-green !h-[18px] !px-1.5 !text-[10px]">Sandbox</span>
+              </div>
+              <div className="mt-0.5 truncate font-mono text-xs text-muted" title={account.merchantId ? `PayPal merchant ID ${account.merchantId}` : undefined}>
+                {account.email ?? 'PayPal sandbox business account'}
+              </div>
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-3 sm:items-end">
