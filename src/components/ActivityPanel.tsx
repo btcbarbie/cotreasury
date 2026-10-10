@@ -34,6 +34,22 @@ function readable(e: ActivityEvent) {
         : `${amount} came into the PayPal account outside CoTreasury${who ? ` from ${who}` : ''}.`
     }
   }
+  if (e.action === 'PANEL_DRAWN') {
+    const m = text.match(/^drew a hidden review panel of (\d+) for (".+?")/)
+    if (m) return `picked ${m[1]} reviewer${m[1] === '1' ? '' : 's'} at random for ${m[2]}. Their names stay hidden until the vote is over.`
+  }
+  if (e.action === 'PANEL_REVEALED') {
+    const m = text.match(/^revealed the review panel for (".+?"): (.+?) \(seed [0-9a-f]+\)$/)
+    if (m) return `revealed who reviewed ${m[1]}: ${m[2]}.`
+  }
+  if (e.action === 'REQUEST_CREATED') {
+    const m = text.match(/^(requested|asked for a refund of) (\$[\d,.]+) for (".+?") \(needs (\d+) approvals?( from a hidden review panel)?\)$/)
+    if (m) return `${m[1]} ${m[2]} for ${m[3]}. It needs ${m[4]} approval${m[4] === '1' ? '' : 's'}${m[5] ? ' from the hidden panel' : ''}.`
+  }
+  if (e.action === 'VOTE_APPROVE' || e.action === 'VOTE_REJECT') {
+    const m = text.match(/^(approved|rejected) (".+?") \((\d+) of (\d+)\)$/)
+    if (m) return `${m[1]} ${m[2]}: ${m[3]} of ${m[4]} approvals so far.`
+  }
   if (e.action === 'OPENING_BALANCE_IMPORTED') {
     const m = text.match(/opening balance of (\$[\d,.]+)/)
     if (m) return `carried over an opening balance of ${m[1]}`
