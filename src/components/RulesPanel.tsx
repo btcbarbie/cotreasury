@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { proposeRuleChange } from '@/app/c/[id]/actions'
-import { Avatar, RoleBadge } from './ui'
+import { Avatar } from './ui'
 import { EXIT_POLICIES, type ExitPolicy } from '@/lib/exitPolicy'
 
 type Member = { id: string; name: string; email: string; role: string }
@@ -54,8 +54,7 @@ export function RulesPanel({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-      <div className="card p-5">
+    <div className="card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 font-medium">
@@ -104,35 +103,31 @@ export function RulesPanel({
             </span>
             <span className="pill pill-violet shrink-0">{EXIT_POLICIES.find((p) => p.id === exitPolicy)?.label}</span>
           </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4">
-        <div className="card p-5">
-          <div className="font-medium">Approvers</div>
-          <p className="mt-1 text-sm text-muted">Chosen by the group, not by who contributes most.</p>
-          <div className="mt-4 grid gap-3">
-            {approvers.map((m) => (
-              <div key={m.id} className="flex items-center gap-3">
-                <Avatar name={m.name} />
-                <span className="flex-1 truncate text-sm">{m.name}</span>
-                <RoleBadge role={m.role} />
-              </div>
-            ))}
+          <div className="flex items-start justify-between gap-4 py-3 text-sm">
+            <span>
+              Approvers
+              <span className="block text-xs text-muted">Chosen by the group, not by who contributes most.</span>
+            </span>
+            <span className="flex flex-wrap justify-end gap-1.5">
+              {approvers.map((m) => (
+                <span key={m.id} className="inline-flex items-center gap-1 rounded-full bg-bg py-0.5 pl-0.5 pr-2 text-xs">
+                  <Avatar name={m.name} size={18} />
+                  {m.name.split(' ')[0]}
+                </span>
+              ))}
+            </span>
           </div>
-        </div>
-        <div className="card p-5">
-          <div className="font-medium">Dual controls</div>
-          <p className="mt-1 text-sm text-muted">The same safeguards corporate bank accounts use, built in.</p>
-          <ul className="mt-3 grid gap-2.5">
-            {CONTROLS.map((c) => (
-              <li key={c.title} className="text-sm">
-                <span className="font-medium">{c.title}.</span> <span className="text-muted">{c.body}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
+      <details className="mt-2 rounded-lg bg-bg/70 px-3 py-2 text-sm">
+        <summary className="cursor-pointer text-muted">Built-in safeguards ({CONTROLS.length})</summary>
+        <ul className="mt-2 grid gap-1.5 pb-1">
+          {CONTROLS.map((c) => (
+            <li key={c.title}>
+              <span className="font-medium">{c.title}.</span> <span className="text-muted">{c.body}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   )
 }

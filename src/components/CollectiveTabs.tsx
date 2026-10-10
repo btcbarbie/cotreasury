@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { AlertTriangle, Check, Loader2, RotateCcw, Scale, Send, UsersRound, X } from 'lucide-react'
+import { AlertTriangle, Check, Link2, Loader2, RotateCcw, Scale, Send, UsersRound, X } from 'lucide-react'
 import { decideRequest, refreshCollective, retryRequestPayout, cancelClose } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
@@ -69,6 +69,7 @@ export function CollectiveTabs(props: {
   proposals: Proposal[]
 }) {
   const [tab, setTab] = useState<Tab>('Overview')
+  const [inviteOpen, setInviteOpen] = useState(false)
   const attention = attentionItems({
     proposals: props.proposals,
     entries: props.entries,
@@ -175,9 +176,18 @@ export function CollectiveTabs(props: {
             <CollapsibleSection
               title="Members"
               count={props.members.length}
-              actions={props.viewerRole === 'ADMIN' ? <AddMemberButton collectiveId={props.collectiveId} /> : undefined}
+              actions={
+                props.viewerRole === 'ADMIN' ? (
+                  <div className="flex flex-1 flex-wrap justify-end gap-2">
+                    <button className="btn btn-ghost !h-8" onClick={() => setInviteOpen(!inviteOpen)} aria-expanded={inviteOpen}>
+                      <Link2 size={14} /> Invite link
+                    </button>
+                    <AddMemberButton collectiveId={props.collectiveId} />
+                  </div>
+                ) : undefined
+              }
             >
-              {props.viewerRole === 'ADMIN' && <InviteLinkCard collectiveId={props.collectiveId} code={props.inviteCode} />}
+              {props.viewerRole === 'ADMIN' && inviteOpen && <InviteLinkCard collectiveId={props.collectiveId} code={props.inviteCode} />}
               <MembersPanel members={props.members} />
             </CollapsibleSection>
             <CollapsibleSection title="Rules & governance">
@@ -192,7 +202,8 @@ export function CollectiveTabs(props: {
                 ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
               />
             </CollapsibleSection>
-            <CollapsibleSection title="Leaving & closing">
+            {/* Rarely needed, so tucked away: closed by default, quiet heading, last on the page. */}
+            <CollapsibleSection title="Leave or close this treasury" defaultOpen={false} muted>
               <ExitPanel collectiveId={props.collectiveId} currency={props.currency} viewerRole={props.viewerRole} exit={props.exit} />
             </CollapsibleSection>
           </div>

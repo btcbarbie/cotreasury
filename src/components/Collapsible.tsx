@@ -25,19 +25,26 @@ export function CollapsibleSection({
   count,
   actions,
   defaultOpen = true,
+  muted = false,
   children,
 }: {
   title: ReactNode
   count?: number
   actions?: ReactNode
   defaultOpen?: boolean
+  /** Small grey heading, for sections people rarely need. */
+  muted?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <button type="button" onClick={() => setOpen(!open)} className="flex items-center gap-1.5 text-left font-semibold tracking-tight">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className={`flex items-center gap-1.5 text-left tracking-tight ${muted ? 'text-sm text-muted hover:text-ink' : 'font-semibold'}`}
+        >
           <ChevronDown size={16} className={`text-muted transition-transform ${open ? '' : '-rotate-90'}`} />
           {title}
           {count != null && <span className="tabular text-sm font-normal text-muted">{count}</span>}
