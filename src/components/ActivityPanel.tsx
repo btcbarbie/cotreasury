@@ -62,7 +62,8 @@ export function ActivityPanel({ collectiveId, events }: { collectiveId: string; 
             <ActorMark actor={e.actor} />
             <div className="min-w-0 flex-1">
               <div className="text-sm">
-                <span className="font-medium">{e.actor}</span> {e.summary}
+                {/* Display only: the sealed text keeps "(imported record)"; the demo context already says it. */}
+                <span className="font-medium">{e.actor}</span> {e.summary.replace(/\s*\(imported record\)/g, '')}
               </div>
               <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-faint">
                 <span>

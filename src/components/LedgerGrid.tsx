@@ -141,8 +141,8 @@ function StatusCell({ r }: { r: Row }) {
   }
   const pill =
     r.status === 'CONFIRMED' ? { cls: 'pill-green', label: r.source === 'IMPORTED' ? 'Recorded' : 'Verified' } : r.status === 'FAILED' ? { cls: 'pill-red', label: 'Failed' } : { cls: 'pill-amber', label: 'Pending' }
-  let line: string
-  if (r.source === 'IMPORTED') line = 'Imported from earlier records'
+  let line: string | null
+  if (r.source === 'IMPORTED') line = null
   else if (r.type === 'PAYOUT') {
     const approvers = r.approvedBy.length ? r.approvedBy.map((n) => n.split(' ')[0]).join(', ') : 'nobody'
     line = `Requested by ${r.requestedBy?.split(' ')[0] ?? 'unknown'} · approved by ${approvers}`
@@ -154,9 +154,11 @@ function StatusCell({ r }: { r: Row }) {
       <span className={`pill ${pill.cls} w-fit`}>
         <span className="h-1.5 w-1.5 rounded-full bg-current" /> {pill.label}
       </span>
-      <span className="mt-1 truncate text-[11px] text-muted" title={line}>
-        {line}
-      </span>
+      {line && (
+        <span className="mt-1 truncate text-[11px] text-muted" title={line}>
+          {line}
+        </span>
+      )}
     </div>
   )
 }
@@ -269,7 +271,7 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
             <div className="flex h-full items-center">
               <button
                 onClick={() => setReceiptFor(r)}
-                title={available ? 'Open the PayPal receipt' : 'Imported record: see what was recorded'}
+                title={available ? 'Open the PayPal receipt' : 'See what was recorded'}
                 className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${available ? 'bg-blue-soft text-blue hover:bg-blue hover:text-white' : 'bg-bg text-faint hover:text-ink'}`}
                 aria-label="Open receipt"
               >

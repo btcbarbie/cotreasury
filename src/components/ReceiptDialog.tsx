@@ -92,7 +92,7 @@ export function ReceiptDialog({
                   </div>
                 ))}
             </dl>
-            <p className="mt-4 text-xs text-muted">{recorded.note ?? 'Imported from the group’s earlier records, so there’s no PayPal transaction behind it.'}</p>
+            {recorded.note && <p className="mt-4 text-xs text-muted">{recorded.note}</p>}
           </>
         )}
         {!recorded && !r && !state.error && (
