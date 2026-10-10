@@ -127,7 +127,14 @@ async function loadState(collectiveId: string) {
       members: { where: { role: { not: 'FORMER' } } },
       goals: true,
       tiers: { orderBy: { minCents: 'asc' } },
-      entries: { orderBy: { createdAt: 'desc' } },
+      entries: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          proposal: {
+            select: { title: true, proposedBy: { select: { name: true } }, approvals: { where: { decision: 'APPROVE' }, select: { member: { select: { name: true } } } } },
+          },
+        },
+      },
       proposals: { include: { approvals: true } },
     },
   })
@@ -212,12 +219,23 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
             rejections: p.approvals.filter((a) => a.decision === 'REJECT').length,
             risk_flags: p.flags ? (JSON.parse(p.flags) as Flag[]).map((f) => f.message) : [],
           })),
-        recent_ledger: c.entries.slice(0, 8).map((e) => ({
+        // Newest first. Enough detail to explain any entry someone asks about from the ledger.
+        recent_ledger: c.entries.slice(0, 40).map((e) => ({
           date: e.createdAt.toISOString().slice(0, 10),
           type: e.type,
           amount: `${e.direction === 'IN' ? '+' : '-'}${formatMoney(e.amountCents, cur, { cents: true })}`,
+          who: e.counterparty,
           memo: e.memo,
           status: e.status,
+          recorded_by:
+            e.source === 'IMPORTED'
+              ? "imported from the group's earlier records (no PayPal transaction)"
+              : e.source === 'PAYPAL_WEBHOOK'
+                ? 'confirmed by a signed PayPal webhook'
+                : 'confirmed by a PayPal status check',
+          requested_by: e.proposal?.proposedBy?.name ?? null,
+          approved_by: e.proposal ? e.proposal.approvals.map((a) => a.member.name) : null,
+          request_title: e.proposal?.title ?? null,
         })),
       },
       check: 'Read the ledger and spending rules',

@@ -1,28 +1,49 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, ShieldCheck, X } from 'lucide-react'
+import { Loader2, ShieldCheck, Sparkles, X } from 'lucide-react'
 import type { Receipt } from '@/app/api/ledger/[entryId]/receipt/route'
+import { openAsk } from '@/lib/ask'
 
-/** PayPal's own record of a ledger transaction, fetched live from PayPal. */
-export function ReceiptDialog({ entryId, title, onClose }: { entryId: string; title: string; onClose: () => void }) {
+/** What the ledger itself recorded, shown when there's no PayPal transaction (imported history). */
+export type RecordedEntry = { kind: string; amount: string; date: string; counterparty: string | null; memo: string | null; status: string }
+
+/**
+ * PayPal's own record of a ledger transaction, fetched live from PayPal, or,
+ * for imported history, the entry as recorded. Either way: ask the AI about it.
+ */
+export function ReceiptDialog({
+  entryId,
+  title,
+  recorded,
+  askPrompt,
+  onClose,
+}: {
+  entryId: string
+  title: string
+  /** Set for imported entries: there's no PayPal transaction to fetch. */
+  recorded?: RecordedEntry
+  askPrompt: string
+  onClose: () => void
+}) {
   const [state, setState] = useState<{ receipt?: Receipt; error?: string }>({})
 
   useEffect(() => {
     let cancelled = false
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onKey)
+    if (recorded) return () => document.removeEventListener('keydown', onKey)
     fetch(`/api/ledger/${entryId}/receipt`, { cache: 'no-store' })
       .then(async (r) => {
         const d = await r.json()
         if (!cancelled) setState(r.ok ? { receipt: d } : { error: d.error ?? 'Could not load the receipt.' })
       })
       .catch(() => !cancelled && setState({ error: 'Could not reach PayPal.' }))
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
     return () => {
       cancelled = true
       document.removeEventListener('keydown', onKey)
     }
-  }, [entryId, onClose])
+  }, [entryId, onClose, recorded])
 
   const r = state.receipt
   const rows: [string, string | null][] = r
@@ -43,14 +64,38 @@ export function ReceiptDialog({ entryId, title, onClose }: { entryId: string; ti
       <div className="card w-full rounded-b-none p-6 shadow-[0_20px_60px_rgba(0,0,0,0.15)] sm:max-w-md sm:rounded-b-[14px]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-blue">PayPal receipt</div>
+            <div className={`text-xs font-medium uppercase tracking-wide ${recorded ? 'text-muted' : 'text-blue'}`}>{recorded ? 'Ledger record' : 'PayPal receipt'}</div>
             <div className="mt-0.5 text-lg font-semibold tracking-tight">{title}</div>
           </div>
           <button onClick={onClose} className="text-muted hover:text-ink" aria-label="Close">
             <X size={18} />
           </button>
         </div>
-        {!r && !state.error && (
+        {recorded && (
+          <>
+            <dl className="mt-5 divide-y divide-line rounded-xl bg-bg/70 text-sm">
+              {(
+                [
+                  ['Type', recorded.kind],
+                  ['Amount', recorded.amount],
+                  ['Who', recorded.counterparty],
+                  ['For', recorded.memo],
+                  ['Status', recorded.status],
+                  ['Date', recorded.date],
+                ] as [string, string | null][]
+              )
+                .filter(([, v]) => v)
+                .map(([k, v]) => (
+                  <div key={k} className="flex items-start justify-between gap-4 px-3.5 py-2.5">
+                    <dt className="text-muted">{k}</dt>
+                    <dd className="break-all text-right font-medium">{v}</dd>
+                  </div>
+                ))}
+            </dl>
+            <p className="mt-4 text-xs text-muted">Imported from the group&apos;s earlier records, so there&apos;s no PayPal transaction behind it.</p>
+          </>
+        )}
+        {!recorded && !r && !state.error && (
           <div className="mt-6 flex items-center gap-2 text-sm text-muted">
             <Loader2 size={15} className="animate-spin" /> Asking PayPal…
           </div>
@@ -74,6 +119,16 @@ export function ReceiptDialog({ entryId, title, onClose }: { entryId: string; ti
             </p>
           </>
         )}
+        <button
+          type="button"
+          className="mt-4 inline-flex items-center gap-1.5 text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+          onClick={() => {
+            onClose()
+            openAsk(askPrompt)
+          }}
+        >
+          <Sparkles size={12} /> Ask about this payment
+        </button>
       </div>
     </div>
   )

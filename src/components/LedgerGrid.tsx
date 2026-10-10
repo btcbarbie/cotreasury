@@ -267,10 +267,9 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
           return (
             <div className="flex h-full items-center">
               <button
-                onClick={() => available && setReceiptFor(r)}
-                disabled={!available}
-                title={available ? 'Open the PayPal receipt' : 'Imported record: no PayPal receipt'}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-soft text-blue transition hover:bg-blue hover:text-white disabled:bg-bg disabled:text-faint"
+                onClick={() => setReceiptFor(r)}
+                title={available ? 'Open the PayPal receipt' : 'Imported record: see what was recorded'}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${available ? 'bg-blue-soft text-blue hover:bg-blue hover:text-white' : 'bg-bg text-faint hover:text-ink'}`}
                 aria-label="Open receipt"
               >
                 <ReceiptIcon size={16} />
@@ -379,7 +378,28 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
           animateRows
         />
       </div>
-      {receiptFor && <ReceiptDialog entryId={receiptFor.id} title={payee(receiptFor.counterparty) ?? TYPE_LABEL[receiptFor.type]} onClose={() => setReceiptFor(null)} />}
+      {receiptFor && (
+        <ReceiptDialog
+          entryId={receiptFor.id}
+          title={payee(receiptFor.counterparty) ?? TYPE_LABEL[receiptFor.type]}
+          recorded={
+            receiptFor.paypalRef && receiptFor.source !== 'IMPORTED'
+              ? undefined
+              : {
+                  kind: TYPE_LABEL[receiptFor.type] ?? receiptFor.type,
+                  amount: formatMoney(receiptFor.amountCents, currency, { cents: true }),
+                  date: new Date(receiptFor.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                  counterparty: receiptFor.counterparty,
+                  memo: receiptFor.memo,
+                  status: receiptFor.status === 'CONFIRMED' ? 'Confirmed' : receiptFor.status === 'PENDING' ? 'Pending' : 'Failed',
+                }
+          }
+          askPrompt={`Explain this ledger entry: the ${(TYPE_LABEL[receiptFor.type] ?? receiptFor.type).toLowerCase()} of ${formatMoney(receiptFor.amountCents, currency, { cents: true })}${
+            receiptFor.counterparty ? ` (${payee(receiptFor.counterparty)})` : ''
+          } on ${new Date(receiptFor.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${receiptFor.memo ? `, "${receiptFor.memo}"` : ''}. Who asked for it, who approved it, and how was it confirmed?`}
+          onClose={() => setReceiptFor(null)}
+        />
+      )}
     </div>
   )
 }
