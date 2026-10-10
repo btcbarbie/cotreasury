@@ -134,22 +134,20 @@ async function CollectiveContent({
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">{collective.name}</h1>
           <p className="mt-1.5 max-w-2xl text-muted">{collective.purpose}</p>
           {/* The account that really holds the money, as reported by PayPal, not a label we typed in. */}
-          <div className="mt-4 inline-flex max-w-full items-center gap-3 rounded-xl border border-blue/20 bg-blue-soft px-3.5 py-2.5">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue text-white">
-              <Wallet size={16} />
+          <div className="mt-4 inline-flex max-w-full items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue text-white">
+              <Wallet size={15} />
             </span>
             <div className="min-w-0 leading-tight">
               <div
-                className="text-sm font-semibold text-blue"
-                title={ownAccount ? 'This group’s own PayPal business account: contributions land here and payouts leave from here.' : 'Shared by treasuries without their own account. In real use each group connects its own.'}
+                className="flex items-center gap-2 text-sm font-medium"
+                title={ownAccount ? 'This group’s own PayPal business account' : 'Shared by treasuries without their own account. In real use each group connects its own.'}
               >
-                {ownAccount ? 'Money held in the group’s PayPal account' : 'Money held in a shared PayPal account'}
+                {ownAccount ? 'Group PayPal account' : 'Shared PayPal account'}
+                <span className="pill pill-green !h-[18px] !px-1.5 !text-[10px]">Sandbox</span>
               </div>
-              <div className="mt-1 flex min-w-0 items-center gap-2">
-                <span className="truncate font-mono text-xs text-blue/75" title={account.merchantId ? `PayPal merchant ID ${account.merchantId}` : undefined}>
-                  {account.email ?? 'PayPal sandbox business account'}
-                </span>
-                <span className="shrink-0 rounded-full bg-white px-1.5 py-px text-[10px] font-semibold text-blue ring-1 ring-blue/20">Sandbox</span>
+              <div className="mt-0.5 truncate font-mono text-xs text-muted" title={account.merchantId ? `PayPal merchant ID ${account.merchantId}` : undefined}>
+                {account.email ?? 'PayPal sandbox business account'}
               </div>
             </div>
           </div>
