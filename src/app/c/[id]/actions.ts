@@ -457,7 +457,9 @@ export async function checkPayPalNow(collectiveId: string): Promise<{ ok: true; 
     if (!r.checked) return { ok: false, error: r.reason === 'shared account' ? 'This group uses the shared demo account, which mixes several groups, so it can’t be checked.' : 'Try again in a moment.' }
     refresh()
     return { ok: true, flagged: r.flagged }
-  } catch {
+  } catch (e) {
+    // 403: the group's PayPal app doesn't have the Transaction search feature switched on.
+    if ((e as { status?: number }).status === 403) return { ok: false, error: 'Turn on Transaction search for this group’s PayPal app first.' }
     return { ok: false, error: 'PayPal’s transaction history isn’t reachable right now.' }
   }
 }

@@ -512,38 +512,33 @@ function MembersPanel({ members }: { members: Member[] }) {
   )
 }
 
-/** Is the ledger checked against PayPal's own history, and when was it last checked? */
+/** Is the ledger checked against PayPal's own history, and when was it last checked? One quiet line. */
 function OutsideCheckBar({ collectiveId, check }: { collectiveId: string; check: { enabled: boolean; lastAt: string | null; since: string | null } }) {
   const [pending, start] = useTransition()
   const [note, setNote] = useState<string | null>(null)
   if (!check.enabled) {
     return (
-      <div className="mb-3 flex items-start gap-2 rounded-lg bg-bg px-3 py-2 text-xs text-muted">
-        <ShieldCheck size={14} className="mt-px shrink-0" />
-        Payments made directly in PayPal are checked once this group connects its own PayPal account. This one shares the demo account with other groups.
-      </div>
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+        <ShieldCheck size={12} /> Payments made directly in PayPal are checked once this group has its own PayPal account.
+      </p>
     )
   }
   function run() {
     setNote(null)
     start(async () => {
       const r = await checkPayPalNow(collectiveId)
-      setNote(r.ok ? (r.flagged ? `${r.flagged} new movement${r.flagged === 1 ? '' : 's'} made outside CoTreasury.` : 'Everything in PayPal matches the ledger.') : r.error)
+      setNote(r.ok ? (r.flagged ? `${r.flagged} new outside movement${r.flagged === 1 ? '' : 's'}` : 'All matches') : r.error)
     })
   }
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent-soft/60 px-3 py-2 text-xs text-accent">
-      <span className="flex items-start gap-2">
-        <ShieldCheck size={14} className="mt-px shrink-0" />
-        <span>
-          Checked against PayPal&apos;s own account history{check.lastAt ? `, last at ${new Date(check.lastAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}. Anything done
-          directly in PayPal shows up red. PayPal&apos;s history can lag by a few minutes.
-          {note && <span className="ml-1 font-medium">{note}</span>}
-        </span>
-      </span>
-      <button className="btn btn-ghost !h-7 !text-xs" onClick={run} disabled={pending}>
-        {pending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Check now
+    <p className="mb-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted" title="Anything done directly in PayPal shows up red. PayPal's history can lag by a few minutes.">
+      <ShieldCheck size={12} className="text-accent" /> Checked against PayPal
+      {check.lastAt && <> · {new Date(check.lastAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</>}
+      <span>·</span>
+      <button className="inline-flex items-center gap-1 font-medium text-ink underline-offset-2 hover:underline disabled:opacity-50" onClick={run} disabled={pending}>
+        {pending && <Loader2 size={11} className="animate-spin" />} Check now
       </button>
-    </div>
+      {note && <span className="text-accent">· {note}</span>}
+    </p>
   )
 }

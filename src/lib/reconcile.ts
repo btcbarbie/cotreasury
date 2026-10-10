@@ -55,8 +55,10 @@ export async function reconcile(collectiveId: string, { force = false } = {}): P
   })
   if (claimed.count === 0 && !force) return { checked: false, flagged: 0, reason: 'already running' }
 
-  const since = new Date(Math.max(c.paypalMonitorSince.getTime(), now.getTime() - WINDOW_MS))
-  const history = await searchTransactions(since, now, c.paypalAccount)
+  // PayPal's history runs behind real time and rejects a start date it hasn't
+  // caught up to yet, so always ask for the full window and filter dates here.
+  const since = c.paypalMonitorSince
+  const history = await searchTransactions(new Date(now.getTime() - WINDOW_MS), now, c.paypalAccount)
 
   const entries = await prisma.ledgerEntry.findMany({
     where: { collectiveId: c.id },
@@ -80,6 +82,7 @@ export async function reconcile(collectiveId: string, { force = false } = {}): P
     const value = parseFloat(t.transaction_amount.value)
     const cents = Math.round(Math.abs(value) * 100)
     const at = new Date(t.transaction_initiation_date)
+    if (at < since) continue // before monitoring started: the account's past
 
     if (t.transaction_event_code === 'T0001') {
       const i = unlinkedPayouts.findIndex((e) => e.amountCents === cents && Math.abs(e.createdAt.getTime() - at.getTime()) < 3 * DAY)
