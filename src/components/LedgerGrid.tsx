@@ -60,7 +60,7 @@ function TotalsCell(p: ICellRendererParams<Row, unknown, GridContext>) {
           Money in <span className="tabular font-semibold text-accent">{formatMoney(totals.inCents, currency)}</span>
         </span>
         <span>
-          Money out <span className="tabular font-semibold text-ink">{formatMoney(totals.outCents, currency)}</span>
+          Money out <span className="tabular font-semibold text-blue">{formatMoney(totals.outCents, currency)}</span>
         </span>
       </div>
     )
@@ -242,7 +242,8 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
         type: 'rightAligned',
         cellRenderer: (p: ICellRendererParams<Row>) =>
           p.data ? (
-            <span className={`tabular font-semibold ${p.data.type === 'UNAPPROVED_MOVEMENT' ? 'text-red' : p.data.direction === 'IN' ? 'text-accent' : ''} ${p.data.status === 'FAILED' ? 'line-through opacity-50' : ''}`}>
+            // Money in green, money out blue, money moved outside CoTreasury red.
+            <span className={`tabular font-semibold ${p.data.type === 'UNAPPROVED_MOVEMENT' ? 'text-red' : p.data.direction === 'IN' ? 'text-accent' : 'text-blue'} ${p.data.status === 'FAILED' ? 'line-through opacity-50' : ''}`}>
               {p.data.direction === 'IN' ? '+' : '−'}
               {formatMoney(p.data.amountCents, currency)}
             </span>

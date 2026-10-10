@@ -70,7 +70,7 @@ async function CollectiveContent({
   const outflow = collective.entries.filter((e) => e.direction === 'OUT' && e.status === 'CONFIRMED').reduce((s, e) => s + e.amountCents, 0)
   const stats = [
     { label: 'Total inflow', value: inflow, sign: '+', hint: 'All money in, confirmed by PayPal', Icon: ArrowDownLeft, tone: 'bg-accent-soft text-accent', valueTone: 'text-accent' },
-    { label: 'Total outflow', value: outflow, sign: '−', hint: 'All money out, confirmed by PayPal', Icon: ArrowUpRight, tone: 'bg-red-soft text-red' },
+    { label: 'Total outflow', value: outflow, sign: '−', hint: 'All money out, confirmed by PayPal', Icon: ArrowUpRight, tone: 'bg-blue-soft text-blue', valueTone: 'text-blue' },
     { label: 'Current balance', value: treasury.confirmedBalanceCents, sign: '=', hint: 'Total inflow minus total outflow', Icon: Landmark, tone: 'bg-teal-soft text-teal', primary: true },
     { label: 'Awaiting approval', value: treasury.awaitingApprovalCents, hint: 'Requests still being voted on', Icon: Clock, tone: 'bg-amber-soft text-amber' },
   ]
