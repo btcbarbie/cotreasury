@@ -17,6 +17,13 @@ export async function admitMember(
   if (!name || !EMAIL.test(email)) return { ok: false, error: 'Add a name and a valid email.' }
   const existing = await prisma.member.findUnique({ where: { collectiveId_email: { collectiveId, email } } })
   if (existing && existing.role !== 'FORMER') return { ok: false, error: 'Someone with that email is already a member.' }
+  const [c, active] = await Promise.all([
+    prisma.collective.findUniqueOrThrow({ where: { id: collectiveId }, select: { maxMembers: true } }),
+    prisma.member.count({ where: { collectiveId, role: { not: 'FORMER' } } }),
+  ])
+  if (active >= c.maxMembers) {
+    return { ok: false, error: `This treasury is full (${active} of ${c.maxMembers} members). The group can raise the limit with a rule change.` }
+  }
   // New members start with nothing unread: they only hear about what happens after they join.
   const head = await prisma.auditEvent.findFirst({ where: { collectiveId }, orderBy: { seq: 'desc' }, select: { seq: true } })
   const member = existing

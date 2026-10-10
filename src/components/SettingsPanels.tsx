@@ -71,8 +71,9 @@ export function TreasuryDetailsCard({ collectiveId, name, purpose, isAdmin }: { 
 }
 
 /** Add a member. New members join as contributors; approver roles change through governed rule changes. */
-export function AddMemberButton({ collectiveId }: { collectiveId: string }) {
+export function AddMemberButton({ collectiveId, inviteCode, full }: { collectiveId: string; inviteCode: string | null; full: boolean }) {
   const [open, setOpen] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -91,8 +92,13 @@ export function AddMemberButton({ collectiveId }: { collectiveId: string }) {
 
   if (!open) {
     return (
-      <button className="btn btn-ghost !h-8" onClick={() => setOpen(true)}>
-        <UserPlus size={14} /> Add member
+      <button
+        className="btn btn-ghost !h-8"
+        onClick={() => setOpen(true)}
+        disabled={full}
+        title={full ? 'The group is at its member limit. Raise it with a rule change.' : undefined}
+      >
+        <UserPlus size={14} /> {full ? 'Group is full' : 'Add member'}
       </button>
     )
   }
@@ -113,6 +119,17 @@ export function AddMemberButton({ collectiveId }: { collectiveId: string }) {
       </div>
       <p className="mt-2 text-xs text-muted">They join as a member who can contribute and see everything. To make them an approver, propose a rule change.</p>
       {error && <div className="mt-2 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
+
+      <div className="mt-4 border-t border-line pt-3">
+        <button type="button" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink" onClick={() => setShowInvite(!showInvite)} aria-expanded={showInvite}>
+          <Link2 size={14} /> Or send them an invite link to add themselves
+        </button>
+        {showInvite && (
+          <div className="mt-3">
+            <InviteLinkCard collectiveId={collectiveId} code={inviteCode} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -147,7 +164,7 @@ export function InviteLinkCard({ collectiveId, code }: { collectiveId: string; c
   }
 
   return (
-    <div className="card mb-4 p-4">
+    <div className="rounded-xl border border-line p-4">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Link2 size={15} className="text-muted" /> Invite link
       </div>

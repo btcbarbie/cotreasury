@@ -236,6 +236,7 @@ async function CollectiveContent({
         viewerRole={viewer.role}
         exit={exit}
         exitPolicy={collective.exitPolicy}
+        maxMembers={collective.maxMembers}
         inviteCode={viewer.role === 'ADMIN' ? collective.inviteCode : null}
         members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role }))}
         tiers={collective.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals }))}

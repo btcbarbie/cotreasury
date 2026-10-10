@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { canApprove, computeTreasury, tierFor } from './treasury'
 import { formatMoney } from './money'
 import { EXIT_POLICIES, exitPolicyLabel, type ExitPolicy } from './exitPolicy'
+import { MEMBER_LIMIT_MAX } from './limits'
 
 // Bank-style dual-control rules, all deterministic. The AI Treasurer reads
 // these results and explains them; it never decides them.
@@ -22,6 +23,7 @@ export type RulesPayload = {
   approvalMode?: ApprovalMode
   removeMemberIds?: string[]
   exitPolicy?: ExitPolicy
+  maxMembers?: number
 }
 
 type Recipient = { name: string; receiver: string; amountCents: number }
@@ -117,6 +119,9 @@ export async function ruleChangeApprovals(collectiveId: string, makerId: string)
 export function validateRules(rules: RulesPayload, memberIds: Set<string>): string | null {
   if (rules.approvalMode && !['FIXED', 'RANDOM', 'MIXED'].includes(rules.approvalMode)) return 'Unknown approval mode.'
   if (rules.exitPolicy && !EXIT_POLICIES.some((p) => p.id === rules.exitPolicy)) return 'Unknown exit policy.'
+  if (rules.maxMembers != null && (!Number.isInteger(rules.maxMembers) || rules.maxMembers < 2 || rules.maxMembers > MEMBER_LIMIT_MAX)) {
+    return `The member limit must be between 2 and ${MEMBER_LIMIT_MAX}.`
+  }
   if ((rules.removeMemberIds ?? []).some((id) => rules.approverIds.includes(id))) return 'Remove someone from the approvers before removing them from the group.'
   if (rules.approverIds.length < 2) return 'Keep at least two approvers so no one can approve alone.'
   if (rules.approverIds.some((id) => !memberIds.has(id))) return 'Approvers must be members of the group.'
@@ -158,6 +163,7 @@ export function describeRuleChange(current: RulesPayload, next: RulesPayload, na
   const fromExit = current.exitPolicy ?? 'VOTE'
   const toExit = next.exitPolicy ?? fromExit
   if (fromExit !== toExit) lines.push(`If someone leaves or the group closes: ${exitPolicyLabel(fromExit)} → ${exitPolicyLabel(toExit)}`)
+  if (next.maxMembers != null && next.maxMembers !== current.maxMembers) lines.push(`Member limit: ${current.maxMembers} → ${next.maxMembers}`)
   if (next.removeMemberIds?.length) lines.push(`Remove from the group: ${next.removeMemberIds.map((id) => names.get(id)).join(', ')}`)
   return lines
 }

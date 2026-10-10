@@ -27,7 +27,7 @@ async function Invite({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const c = await prisma.collective.findFirst({
     where: { inviteCode: code, status: 'OPEN' },
-    select: { name: true, purpose: true, members: { where: { role: { not: 'FORMER' } }, select: { role: true } } },
+    select: { name: true, purpose: true, maxMembers: true, members: { where: { role: { not: 'FORMER' } }, select: { role: true } } },
   })
   if (!c) {
     return (
@@ -44,14 +44,20 @@ async function Invite({ params }: { params: Promise<{ code: string }> }) {
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">{c.name}</h1>
       <p className="mt-2 text-sm text-muted">{c.purpose}</p>
       <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted">
-        <UsersRound size={13} /> {c.members.length} members
+        <UsersRound size={13} /> {c.members.length} of {c.maxMembers} members
       </div>
       <ul className="mt-5 grid gap-1.5 rounded-lg bg-bg px-4 py-3 text-sm text-ink/80">
         <li>• See every dollar in and out, confirmed by PayPal.</li>
         <li>• Add funds and request payouts. The group&apos;s approvers vote on every payout.</li>
         <li>• Nobody, including the admin, can move money without the group&apos;s rules being met.</li>
       </ul>
-      <JoinForm code={code} />
+      {c.members.length >= c.maxMembers ? (
+        <div className="mt-5 rounded-lg bg-bg px-4 py-3 text-sm text-muted">
+          This group is full. Ask the admin; the group can raise its member limit with a rule change.
+        </div>
+      ) : (
+        <JoinForm code={code} />
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, useTransition, type Ref } from 'react'
 import { AlertTriangle, ArrowUp, Check, FileText, HandCoins, Loader2, Lock, Sparkles, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { submitRequest } from '@/app/c/[id]/actions'
@@ -64,12 +64,15 @@ export function TreasurerPanel({
   currency,
   brief,
   onClose,
+  ref,
 }: {
   collectiveId: string
   kind: string
   currency: string
   brief: string
   onClose: () => void
+  /** Lets the Ask button send a first message (from the "Ask the AI Treasurer" links). */
+  ref?: Ref<{ ask: (question: string) => void }>
 }) {
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
@@ -105,6 +108,8 @@ export function TreasurerPanel({
       setThinking(false)
     }
   }
+  useImperativeHandle(ref, () => ({ ask }))
+
 
   function dropDraft(index: number) {
     setTurns((ts) => ts.map((t, i) => (i === index && t.role === 'assistant' ? { ...t, draft: null } : t)))

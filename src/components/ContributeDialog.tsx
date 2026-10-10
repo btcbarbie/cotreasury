@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Loader2, ShieldCheck, X } from 'lucide-react'
 import { formatMoney } from '@/lib/money'
 import { refreshCollective } from '@/app/c/[id]/actions'
+import { openAsk } from '@/lib/ask'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -285,6 +286,16 @@ function ContributeDialog({
               <span className="font-medium text-ink">Log in</span> and use a PayPal <span className="font-medium text-ink">sandbox personal</span> test account
               (developer.paypal.com → Testing Tools → Sandbox Accounts). Your real PayPal login and the card form won&apos;t work here, and no real money moves.
             </div>
+            <button
+              type="button"
+              className="mt-3 text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+              onClick={() => {
+                onClose()
+                openAsk('I want to pay what I owe')
+              }}
+            >
+              Not sure what to pay? Ask the AI Treasurer
+            </button>
           </>
         )}
 

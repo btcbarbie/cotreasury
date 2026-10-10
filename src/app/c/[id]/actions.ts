@@ -260,7 +260,10 @@ export async function proposeRuleChange(collectiveId: string, rules: RulesPayloa
     newPayeeRule: c.newPayeeRule,
     approvalMode: c.approvalMode as RulesPayload['approvalMode'],
     exitPolicy: c.exitPolicy as ExitPolicy,
+    maxMembers: c.maxMembers,
   }
+  const staying = c.members.filter((m) => m.role !== 'FORMER' && !(rules.removeMemberIds ?? []).includes(m.id)).length
+  if (rules.maxMembers != null && rules.maxMembers < staying) return { ok: false, error: `The group already has ${staying} members, so the limit can’t go below that.` }
   if ((rules.removeMemberIds ?? []).includes(viewer.id)) return { ok: false, error: 'You can’t propose removing yourself.' }
   if (admin && (rules.removeMemberIds ?? []).includes(admin.id)) return { ok: false, error: 'The admin can’t be removed.' }
   const lines = describeRuleChange(current, rules, new Map(c.members.map((m) => [m.id, m.name])), c.currency)
@@ -375,6 +378,7 @@ export async function decideRequest(proposalId: string, decision: 'APPROVE' | 'R
           newPayeeRule: rules.newPayeeRule,
           ...(rules.approvalMode ? { approvalMode: rules.approvalMode } : {}),
           ...(rules.exitPolicy ? { exitPolicy: rules.exitPolicy } : {}),
+          ...(rules.maxMembers != null ? { maxMembers: rules.maxMembers } : {}),
         },
       })
       if (rules.removeMemberIds?.length) {

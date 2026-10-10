@@ -35,6 +35,8 @@ model Collective {
   // "NO_REFUNDS" (gifts to the cause), "UNSPENT_SHARE" (your share of what's
   // left, by contribution) or "VOTE" (the group decides each case).
   exitPolicy  String   @default("VOTE")
+  // Most active members the group allows. Changed only by a rule change.
+  maxMembers  Int      @default(50)
   // "OPEN" → "CLOSING" (final settlement being paid) → "CLOSED" (read-only).
   status      String   @default("OPEN")
   closedAt    DateTime?

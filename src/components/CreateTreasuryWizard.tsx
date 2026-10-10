@@ -7,6 +7,7 @@ import { formatMoney } from '@/lib/money'
 import { Avatar } from './ui'
 import { MODES } from './RulesPanel'
 import { EXIT_POLICIES, exitPolicyLabel, type ExitPolicy } from '@/lib/exitPolicy'
+import { defaultMemberLimit, MEMBER_LIMIT_MAX } from '@/lib/limits'
 
 const STEPS = ['Purpose', 'People', 'Rules', 'PayPal', 'Review'] as const
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -55,6 +56,7 @@ export function CreateTreasuryWizard() {
   const [rows, setRows] = useState<TierRow[] | null>(null)
   const [approvalMode, setApprovalMode] = useState<'FIXED' | 'RANDOM' | 'MIXED'>('FIXED')
   const [exitPolicy, setExitPolicy] = useState<ExitPolicy>('VOTE')
+  const [maxMembers, setMaxMembers] = useState<number | null>(null) // null: the default for the kind
   const [paypalEmail, setPaypalEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -64,6 +66,7 @@ export function CreateTreasuryWizard() {
   const tierRows = rows ?? presetTiers(preset, approverCount)
   const tiers = useMemo(() => toTiers(tierRows), [tierRows])
   const kindMeta = KINDS.find((k) => k.id === kind)!
+  const memberLimit = maxMembers ?? defaultMemberLimit(kind)
 
   // Per-step checks so people can't advance into a broken state.
   function stepError(s: number): string | null {
@@ -85,6 +88,8 @@ export function CreateTreasuryWizard() {
       }
       for (let i = 1; i < tiers.length; i++) if (tiers[i].requiredApprovals < tiers[i - 1].requiredApprovals) return 'Bigger amounts can’t need fewer approvals.'
       if (tiers.some((t) => t.requiredApprovals > approverCount)) return `You only have ${approverCount} approvers.`
+      if (memberLimit < 2) return 'The member limit must be at least 2.'
+      if (memberLimit < filled.length + 1) return `You've added ${filled.length + 1} people; raise the member limit to at least that.`
     }
     if (s === 3 && paypalEmail.trim() && !EMAIL.test(paypalEmail.trim())) return 'Enter a valid PayPal email, or leave it blank to use yours.'
     return null
@@ -114,6 +119,7 @@ export function CreateTreasuryWizard() {
       newPayeeRule: true,
       approvalMode,
       exitPolicy,
+      maxMembers: memberLimit,
       paypalEmail: paypalEmail || creator.email,
     }
     setError(null)
@@ -308,6 +314,18 @@ export function CreateTreasuryWizard() {
                 <p className="text-xs text-amber">With {filled.length + 1} people it&apos;s easy to guess who was drawn. Random panels work best from about 8 members; you can switch later.</p>
               )}
             </div>
+            <div className="mt-5 label">Member limit</div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <input
+                className="input !h-9 !w-24 tabular"
+                inputMode="numeric"
+                value={memberLimit}
+                onChange={(e) => setMaxMembers(Math.min(MEMBER_LIMIT_MAX, Number(e.target.value.replace(/\D/g, '')) || 0))}
+                aria-label="Member limit"
+              />
+              <span className="text-muted">people at most, including you. The group can change it later with a rule change.</span>
+            </div>
+            {memberLimit < filled.length + 1 && <p className="mt-1 text-xs text-red">You&apos;ve added {filled.length + 1} people, more than the limit.</p>}
             <div className="mt-5 label">If someone leaves or the group closes</div>
             <div className="mt-2 grid gap-2">
               {EXIT_POLICIES.map((p) => (
@@ -397,6 +415,7 @@ export function CreateTreasuryWizard() {
                   ))}
                   <li className="text-muted">Reviewed by: {MODES.find((m) => m.id === approvalMode)?.label}</li>
                   <li className="text-muted">If someone leaves or the group closes: {exitPolicyLabel(exitPolicy)}</li>
+                  <li className="text-muted">Member limit: {memberLimit}</li>
                 </ul>
               </div>
               <div className="flex items-center gap-3 rounded-xl bg-bg p-3.5">

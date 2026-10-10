@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { AlertTriangle, Check, Link2, Loader2, RotateCcw, Scale, Send, UsersRound, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, Check, History, LayoutGrid, Loader2, RotateCcw, Scale, Send, SlidersHorizontal, UsersRound, X } from 'lucide-react'
 import { decideRequest, refreshCollective, retryRequestPayout, cancelClose } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
-import { AddMemberButton, InviteLinkCard, TreasuryDetailsCard } from './SettingsPanels'
+import { AddMemberButton, TreasuryDetailsCard } from './SettingsPanels'
 import { ExitPanel, type ExitInfo } from './ExitPanel'
 import { OverviewPanel } from './OverviewPanel'
 import { CollapsibleSection, MinimizeButton } from './Collapsible'
@@ -47,6 +47,7 @@ type Proposal = {
 
 const TABS = ['Overview', 'Activity log', 'Ledger', 'Settings'] as const
 type Tab = (typeof TABS)[number]
+const TAB_ICONS: Record<Tab, typeof Scale> = { Overview: LayoutGrid, 'Activity log': History, Ledger: BookOpen, Settings: SlidersHorizontal }
 
 export function CollectiveTabs(props: {
   collectiveId: string
@@ -60,6 +61,7 @@ export function CollectiveTabs(props: {
   viewerRole: string
   exit: ExitInfo
   exitPolicy: string
+  maxMembers: number
   inviteCode: string | null
   goals: GoalProgress[]
   events: ActivityEvent[]
@@ -69,7 +71,6 @@ export function CollectiveTabs(props: {
   proposals: Proposal[]
 }) {
   const [tab, setTab] = useState<Tab>('Overview')
-  const [inviteOpen, setInviteOpen] = useState(false)
   const attention = attentionItems({
     proposals: props.proposals,
     entries: props.entries,
@@ -107,19 +108,26 @@ export function CollectiveTabs(props: {
 
   return (
     <div id="requests" className="mt-10 scroll-mt-20">
-      <div className="no-scrollbar flex gap-1 border-b border-line overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`relative -mb-px flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition ${
-              tab === t ? 'text-ink border-b-2 border-ink' : 'text-muted hover:text-ink border-b-2 border-transparent'
-            }`}
-          >
-            {t}
-            {counts[t] != null && <span className="tabular text-xs text-faint">{counts[t]}</span>}
-          </button>
-        ))}
+      {/* The four main views: big enough to read as the backbone of the page. */}
+      <div className="no-scrollbar flex gap-1 overflow-x-auto border-b border-line sm:gap-2">
+        {TABS.map((t) => {
+          const Icon = TAB_ICONS[t]
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`relative -mb-px flex shrink-0 items-center gap-2 border-b-[3px] px-3 py-3.5 text-base font-semibold tracking-tight transition sm:px-4 sm:text-lg ${
+                tab === t ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
+              }`}
+            >
+              <Icon size={18} className={tab === t ? 'text-accent' : 'text-faint'} />
+              {t}
+              {counts[t] != null && (
+                <span className={`tabular rounded-full px-2 py-0.5 text-xs font-medium ${tab === t ? 'bg-ink text-white' : 'bg-bg text-muted'}`}>{counts[t]}</span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       <div className="mt-5">
@@ -174,20 +182,20 @@ export function CollectiveTabs(props: {
               isAdmin={props.viewerRole === 'ADMIN'}
             />
             <CollapsibleSection
-              title="Members"
-              count={props.members.length}
+              title={
+                <>
+                  Members{' '}
+                  <span className="tabular text-sm font-normal text-muted">
+                    {props.members.length} of {props.maxMembers}
+                  </span>
+                </>
+              }
               actions={
                 props.viewerRole === 'ADMIN' ? (
-                  <div className="flex flex-1 flex-wrap justify-end gap-2">
-                    <button className="btn btn-ghost !h-8" onClick={() => setInviteOpen(!inviteOpen)} aria-expanded={inviteOpen}>
-                      <Link2 size={14} /> Invite link
-                    </button>
-                    <AddMemberButton collectiveId={props.collectiveId} />
-                  </div>
+                  <AddMemberButton collectiveId={props.collectiveId} inviteCode={props.inviteCode} full={props.members.length >= props.maxMembers} />
                 ) : undefined
               }
             >
-              {props.viewerRole === 'ADMIN' && inviteOpen && <InviteLinkCard collectiveId={props.collectiveId} code={props.inviteCode} />}
               <MembersPanel members={props.members} />
             </CollapsibleSection>
             <CollapsibleSection title="Rules & governance">
@@ -198,6 +206,7 @@ export function CollectiveTabs(props: {
                 currency={props.currency}
                 approvalMode={props.approvalMode}
                 exitPolicy={props.exitPolicy}
+                maxMembers={props.maxMembers}
                 viewerRole={props.viewerRole}
                 ruleChangePending={props.proposals.some((p) => p.kind === 'RULE_CHANGE' && p.status === 'PENDING_APPROVAL')}
               />

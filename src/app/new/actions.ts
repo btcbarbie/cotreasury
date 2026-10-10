@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { MY_TREASURIES_COOKIE, myTreasuryIds, viewerCookieName } from '@/lib/collectives'
 import { validateRules } from '@/lib/governance'
+import { defaultMemberLimit, MEMBER_LIMIT_MAX } from '@/lib/limits'
 import { recordEvent } from '@/lib/audit'
 import { formatMoney } from '@/lib/money'
 import { EXIT_POLICIES, exitPolicyLabel, type ExitPolicy } from '@/lib/exitPolicy'
@@ -19,6 +20,7 @@ export type NewTreasury = {
   newPayeeRule: boolean
   approvalMode?: 'FIXED' | 'RANDOM' | 'MIXED'
   exitPolicy?: ExitPolicy
+  maxMembers?: number
   paypalEmail: string
 }
 
@@ -39,7 +41,9 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
   const people = (input.people ?? [])
     .map((p) => ({ name: p.name?.trim() ?? '', email: p.email?.trim().toLowerCase() ?? '', role: p.role === 'APPROVER' ? 'APPROVER' : 'MEMBER' }))
     .filter((p) => p.name || p.email)
-  if (people.length > 50) return { ok: false, error: 'Up to 50 people for now.' }
+  const maxMembers = Number.isInteger(input.maxMembers) ? input.maxMembers! : defaultMemberLimit(input.kind)
+  if (maxMembers < 2 || maxMembers > MEMBER_LIMIT_MAX) return { ok: false, error: `The member limit must be between 2 and ${MEMBER_LIMIT_MAX}.` }
+  if (people.length + 1 > maxMembers) return { ok: false, error: `That's ${people.length + 1} people, but the member limit is ${maxMembers}. Raise the limit or invite fewer people.` }
   for (const p of people) {
     if (!p.name || !EMAIL.test(p.email)) return { ok: false, error: `Check the name and email for ${p.name || p.email}.` }
   }
@@ -64,6 +68,7 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
       newPayeeRule: true, // standard for every treasury
       approvalMode: ['RANDOM', 'MIXED'].includes(input.approvalMode ?? '') ? input.approvalMode! : 'FIXED',
       exitPolicy: EXIT_POLICIES.some((p) => p.id === input.exitPolicy) ? input.exitPolicy : 'VOTE',
+      maxMembers,
       tiers: { create: tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals })) },
       members: {
         create: [{ name: creator.name, email: creator.email, role: 'ADMIN' }, ...people],

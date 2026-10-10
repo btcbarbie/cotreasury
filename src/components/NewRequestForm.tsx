@@ -5,6 +5,7 @@ import { Loader2, Plus, Send, Trash2, X } from 'lucide-react'
 import { submitRequest } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { normalizeReceiver, RECEIVER_TYPES, type ReceiverType } from '@/lib/recipients'
+import { openAsk } from '@/lib/ask'
 
 type Row = { name: string; type: ReceiverType; receiver: string; amount: string }
 const EMPTY: Row = { name: '', type: 'EMAIL', receiver: '', amount: '' }
@@ -121,6 +122,16 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
       </p>
 
       {error && <div className="mt-3 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">{error}</div>}
+      <button
+        type="button"
+        className="mt-3 text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+        onClick={() => {
+          onClose()
+          openAsk('I want to request a payout')
+        }}
+      >
+        Not sure of the details? Ask the AI Treasurer
+      </button>
       <div className="mt-4 flex items-center justify-between gap-3">
         <span className="tabular text-sm text-muted">
           Total <span className="font-semibold text-ink">{formatMoney(total, currency, { cents: true })}</span>

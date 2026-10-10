@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { TreasurerPanel } from './TreasurerPanel'
+import { ASK_EVENT } from '@/lib/ask'
 
 /**
  * The single way into the AI: a floating Ask button, bottom right. The chat
@@ -10,6 +11,18 @@ import { TreasurerPanel } from './TreasurerPanel'
  */
 export function AskButton(props: { collectiveId: string; kind: string; currency: string; brief: string }) {
   const [open, setOpen] = useState(false)
+  const panel = useRef<{ ask: (question: string) => void }>(null)
+
+  // "Not sure of the details? Ask the AI Treasurer" links elsewhere open the chat with a first message.
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      setOpen(true)
+      const prompt = (e as CustomEvent<{ prompt?: string }>).detail?.prompt
+      if (prompt) panel.current?.ask(prompt)
+    }
+    window.addEventListener(ASK_EVENT, onAsk)
+    return () => window.removeEventListener(ASK_EVENT, onAsk)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -25,7 +38,7 @@ export function AskButton(props: { collectiveId: string; kind: string; currency:
         role="dialog"
         aria-label="AI Treasurer"
       >
-        <TreasurerPanel {...props} onClose={() => setOpen(false)} />
+        <TreasurerPanel {...props} ref={panel} onClose={() => setOpen(false)} />
       </div>
       {/* While the chat is open it has its own close button, so the Ask button steps aside. */}
       {!open && (

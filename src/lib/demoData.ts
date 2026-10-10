@@ -28,6 +28,7 @@ type DemoSeed = {
     purpose: string
     kind: string
     exitPolicy: 'NO_REFUNDS' | 'UNSPENT_SHARE' | 'VOTE'
+    maxMembers: number
     paypalEmail: string
     domain: string
     members: MemberSeed[]
@@ -46,6 +47,7 @@ async function createCollective(prisma: PrismaClient, data: DemoSeed) {
       purpose: data.purpose,
       kind: data.kind,
       exitPolicy: data.exitPolicy,
+      maxMembers: data.maxMembers,
       paypalEmail: data.paypalEmail,
       isDemo: true,
       tiers: { create: data.tiers },
@@ -180,6 +182,7 @@ const DEMO_SEEDS: DemoSeed[] = [
       "Help us give Maya a chance to start college without carrying the whole burden herself. Maya has been accepted to Howard University. We're a group of family friends and former classmates putting money together to help cover her first year. Everyone can see what has come in, what's been approved, and what's been paid.",
     kind: 'SCHOLARSHIP_FUND',
     exitPolicy: 'NO_REFUNDS',
+    maxMembers: 25,
     paypalEmail: 'maya.scholarship@example.com',
     domain: 'friends.example',
     members: [
@@ -225,6 +228,7 @@ const DEMO_SEEDS: DemoSeed[] = [
       "Eight of us. One trip. One place to keep the money together. We're finally doing the trip we've been talking about for years. Everyone is putting in what they can, and we're using this treasury to keep contributions, bookings, and spending in one place.",
     kind: 'GROUP_TRIP',
     exitPolicy: 'UNSPENT_SHARE',
+    maxMembers: 8,
     paypalEmail: 'lisbon.trip@example.com',
     domain: 'friends.example',
     members: [
@@ -270,6 +274,7 @@ const DEMO_SEEDS: DemoSeed[] = [
       "Long-term partnership. We're building our life together, so we want our finances to work that way too. Both of us can contribute, see what's happening, and make decisions about our shared money without one person having to manage everything alone.",
     kind: 'HOUSEHOLD',
     exitPolicy: 'VOTE',
+    maxMembers: 2,
     paypalEmail: 'the.johnsons@example.com',
     domain: 'home.example',
     members: [
@@ -317,6 +322,7 @@ export async function ensureDemoCollectives(prisma: PrismaClient) {
   // Demos still on the default policy (created before exit policies existed) get their story's policy.
   for (const seed of DEMO_SEEDS) {
     await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, exitPolicy: 'VOTE', status: 'OPEN' }, data: { exitPolicy: seed.exitPolicy } })
+    await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, maxMembers: 50 }, data: { maxMembers: seed.maxMembers } })
   }
   const created: string[] = []
   for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.name))) {

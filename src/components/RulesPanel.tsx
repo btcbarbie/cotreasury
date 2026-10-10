@@ -31,6 +31,7 @@ export function RulesPanel({
   currency,
   approvalMode,
   exitPolicy,
+  maxMembers,
   viewerRole,
   ruleChangePending,
 }: {
@@ -40,6 +41,7 @@ export function RulesPanel({
   currency: string
   approvalMode: string
   exitPolicy: string
+  maxMembers: number
   viewerRole: string
   ruleChangePending: boolean
 }) {
@@ -49,7 +51,7 @@ export function RulesPanel({
 
   if (editing) {
     return (
-      <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} approvalMode={approvalMode} exitPolicy={exitPolicy} onClose={() => setEditing(false)} />
+      <RulesEditor collectiveId={collectiveId} tiers={tiers} members={members} approvalMode={approvalMode} exitPolicy={exitPolicy} maxMembers={maxMembers} onClose={() => setEditing(false)} />
     )
   }
 
@@ -105,6 +107,15 @@ export function RulesPanel({
           </div>
           <div className="flex items-start justify-between gap-4 py-3 text-sm">
             <span>
+              Member limit
+              <span className="block text-xs text-muted">Most people the group allows. New members and invite links stop working once it&apos;s full.</span>
+            </span>
+            <span className="tabular shrink-0 text-muted">
+              {members.length} of {maxMembers}
+            </span>
+          </div>
+          <div className="flex items-start justify-between gap-4 py-3 text-sm">
+            <span>
               Approvers
               <span className="block text-xs text-muted">Chosen by the group, not by who contributes most.</span>
             </span>
@@ -144,6 +155,7 @@ function RulesEditor({
   members,
   approvalMode,
   exitPolicy,
+  maxMembers,
   onClose,
 }: {
   collectiveId: string
@@ -151,8 +163,10 @@ function RulesEditor({
   members: Member[]
   approvalMode: string
   exitPolicy: string
+  maxMembers: number
   onClose: () => void
 }) {
+  const [limit, setLimit] = useState(String(maxMembers))
   const [mode, setMode] = useState(approvalMode)
   const [exit, setExit] = useState(exitPolicy as ExitPolicy)
   const [removeIds, setRemoveIds] = useState<string[]>([])
@@ -182,6 +196,7 @@ function RulesEditor({
         newPayeeRule: true,
         approvalMode: mode as 'FIXED' | 'RANDOM' | 'MIXED',
         exitPolicy: exit,
+        maxMembers: Number(limit) || maxMembers,
         removeMemberIds: removeIds,
       })
       if (!res.ok) return setError(res.error)
@@ -297,6 +312,12 @@ function RulesEditor({
             </span>
           </label>
         ))}
+      </div>
+
+      <div className="mt-6 label">Member limit</div>
+      <div className="mt-2 flex items-center gap-2 text-sm">
+        <input className="input !h-9 !w-24 tabular" inputMode="numeric" value={limit} onChange={(e) => setLimit(e.target.value.replace(/\D/g, ''))} aria-label="Member limit" />
+        <span className="text-muted">people at most (currently {members.length})</span>
       </div>
 
       <div className="mt-6 label">Remove from the group</div>
