@@ -531,7 +531,7 @@ function MembersPanel({ members, links }: { members: Member[]; links: Links | nu
   )
 }
 
-/** The admin sends someone they added their sign-in link; once that person opens it, the button goes away. */
+/** The admin sends someone they added their personal invite link; once that person opens it, the button goes away. */
 function SignInLink({ collectiveId, memberId }: { collectiveId: string; memberId: string }) {
   const [state, setState] = useState<'idle' | 'busy' | 'copied'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -558,10 +558,10 @@ function SignInLink({ collectiveId, memberId }: { collectiveId: string; memberId
         disabled={state === 'busy'}
         onClick={copy}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium text-blue hover:bg-blue-soft"
-        title="Send this to them. It signs them in as themselves."
+        title="Send this to them to join. It stops showing once they have."
       >
         {state === 'copied' ? <Check size={13} /> : <Link2 size={13} />}
-        {state === 'copied' ? 'Copied' : 'Copy sign-in link'}
+        {state === 'copied' ? 'Copied' : 'Copy invite link'}
       </button>
     </div>
   )

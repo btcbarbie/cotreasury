@@ -241,7 +241,7 @@ async function CollectiveContent({
           <div>
             <div className="font-medium">Your treasury is open.</div>
             <div className="text-accent/80">
-              Make the first contribution, or send each person their sign-in link from Settings.
+              Make the first contribution, or send each person their invite link from Settings → Members.
             </div>
           </div>
         </div>
@@ -323,7 +323,7 @@ function PrivateTreasury({ name }: { name: string }) {
         <Lock size={20} />
       </span>
       <h1 className="mt-4 text-xl font-semibold">{name}</h1>
-      <p className="mt-2 text-sm text-muted">This treasury is private. Open it from your personal sign-in link, or ask the admin for an invite link.</p>
+      <p className="mt-2 text-sm text-muted">This treasury is private. Ask the admin for an invite link.</p>
       <Link href="/" className="btn btn-ghost mt-6 inline-flex">Go to CoTreasury</Link>
     </div>
   )
