@@ -76,6 +76,12 @@ model Member {
   lastSeenSeq  Int      @default(0)
   // Asked to leave with a refund: still a member until the refund is paid; back to normal if it's rejected.
   leaving     Boolean  @default(false)
+  // Personal link (/m/<token>) that signs a browser in as this member, for
+  // treasuries people create (demos use the Viewing-as switcher instead).
+  accessToken String?
+  // Set once the member has opened their link (or created/joined in this browser).
+  // Until then the admin can copy it for them; after that only they can.
+  accessClaimed Boolean @default(false)
   createdAt    DateTime @default(now())
 
   collective   Collective @relation(fields: [collectiveId], references: [id], onDelete: Cascade)
@@ -85,6 +91,8 @@ model Member {
   reviewSeats  ProposalReviewer[]
 
   @@unique([collectiveId, email])
+
+  @@index([accessToken])
 }
 
 // Spend thresholds: an amount in [minCents, maxCents) needs `requiredApprovals`

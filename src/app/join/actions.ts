@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { admitMember } from '@/lib/members'
-import { MY_TREASURIES_COOKIE, myTreasuryIds, viewerCookieName } from '@/lib/collectives'
+import { MY_TREASURIES_COOKIE, myTreasuryIds, viewerCookieName, VIEWER_COOKIE_OPTIONS } from '@/lib/collectives'
 
 /** Join a treasury through its invite link. Joiners are members; approving needs a governed rule change. */
 export async function joinTreasury(code: string, input: { name: string; email: string }): Promise<{ ok: false; error: string }> {
@@ -16,6 +16,6 @@ export async function joinTreasury(code: string, input: { name: string; email: s
   const jar = await cookies()
   const mine = [...new Set([...(await myTreasuryIds()), collective.id])].slice(-20)
   jar.set(MY_TREASURIES_COOKIE, mine.join(','), { path: '/', sameSite: 'lax', httpOnly: true, maxAge: 60 * 60 * 24 * 180 })
-  jar.set(viewerCookieName(collective.id), r.memberId, { path: '/', sameSite: 'lax', httpOnly: true })
+  jar.set(viewerCookieName(collective.id), r.accessToken ?? r.memberId, VIEWER_COOKIE_OPTIONS)
   redirect(`/c/${collective.id}?joined=1`)
 }

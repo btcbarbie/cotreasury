@@ -6,7 +6,8 @@ import { viewerCookieName } from '@/lib/collectives'
 // the treasury. Same cookie as the member switcher; not authentication.
 export async function GET(_req: Request, ctx: RouteContext<'/c/[id]/as/[memberId]'>) {
   const { id, memberId } = await ctx.params
-  const member = await prisma.member.findFirst({ where: { id: memberId, collectiveId: id } })
+  // Demos only: in a treasury people created, you are only ever yourself.
+  const member = await prisma.member.findFirst({ where: { id: memberId, collectiveId: id, collective: { isDemo: true } } })
   // Relative Location: behind Railway's proxy req.url is the internal
   // http://localhost:8080 address, so an absolute redirect would leave the site.
   const res = new NextResponse(null, { status: 307, headers: { Location: `/c/${encodeURIComponent(id)}` } })

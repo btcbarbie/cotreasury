@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { connection } from 'next/server'
 import Link from 'next/link'
-import { Archive, ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark, Wallet } from 'lucide-react'
+import { Archive, ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark, Lock, Wallet } from 'lucide-react'
 import { getCollectiveView } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 import { ViewerSwitcher } from '@/components/ViewerSwitcher'
@@ -48,6 +48,8 @@ async function CollectiveContent({
   const { collective, viewer, treasury } = view
   // A demo template is never changed directly: each browser works in its own copy.
   if (collective.isDemo && !collective.demoOwner && collective.demoKey) redirect(`/demo/${collective.demoKey}`)
+  // A treasury people created only opens for its members, each signed in as themselves.
+  if (!viewer) return <PrivateTreasury name={collective.name} />
   const ownAccount = hasOwnAccount(collective.paypalAccount)
   const account = await getMerchantAccount(collective.paypalAccount)
   const notifications = await unseenFor(collective.id, viewer)
@@ -134,6 +136,7 @@ async function CollectiveContent({
       <HeaderSlot>
         <ViewerSwitcher
           collectiveId={collective.id}
+          canSwitch={collective.isDemo}
           viewerId={viewer.id}
           members={collective.members.map((m) => ({ id: m.id, name: m.name, role: m.role }))}
         />
@@ -238,7 +241,7 @@ async function CollectiveContent({
           <div>
             <div className="font-medium">Your treasury is open.</div>
             <div className="text-accent/80">
-              Make the first contribution, ask the AI Treasurer what it can do, or switch members (top right) to see what each person sees.
+              Make the first contribution, or send each person their sign-in link from Settings.
             </div>
           </div>
         </div>
@@ -262,7 +265,8 @@ async function CollectiveContent({
         exitPolicy={collective.exitPolicy}
         maxMembers={collective.maxMembers}
         inviteCode={viewer.role === 'ADMIN' ? collective.inviteCode : null}
-        members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role, leaving: m.leaving }))}
+        isDemo={collective.isDemo}
+        members={collective.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role, leaving: m.leaving, claimed: m.accessClaimed }))}
         tiers={collective.tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals }))}
         entries={collective.entries.map((e) => {
           const goal = e.goalId ? collective.goals.find((g) => g.id === e.goalId) : null
@@ -309,5 +313,18 @@ async function CollectiveContent({
         }))}
       />
     </>
+  )
+}
+
+function PrivateTreasury({ name }: { name: string }) {
+  return (
+    <div className="mx-auto max-w-md py-16 text-center">
+      <span className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-xl bg-bg text-muted">
+        <Lock size={20} />
+      </span>
+      <h1 className="mt-4 text-xl font-semibold">{name}</h1>
+      <p className="mt-2 text-sm text-muted">This treasury is private. Open it from your personal sign-in link, or ask the admin for an invite link.</p>
+      <Link href="/" className="btn btn-ghost mt-6 inline-flex">Go to CoTreasury</Link>
+    </div>
   )
 }

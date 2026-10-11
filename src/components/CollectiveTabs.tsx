@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
-import { AlertTriangle, BookOpen, Check, History, LayoutGrid, Loader2, RotateCcw, Scale, Send, SlidersHorizontal, UsersRound, X } from 'lucide-react'
-import { decideRequest, refreshCollective, retryRequestPayout, cancelClose } from '@/app/c/[id]/actions'
+import { AlertTriangle, BookOpen, Check, History, LayoutGrid, Link2, Loader2, RotateCcw, Scale, Send, SlidersHorizontal, UsersRound, X } from 'lucide-react'
+import { decideRequest, refreshCollective, retryRequestPayout, cancelClose, personalLink, resetMyLink } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
@@ -24,7 +24,7 @@ const LedgerGrid = dynamic(() => import('./LedgerGrid').then((m) => m.LedgerGrid
   loading: () => <div className="h-[520px] animate-pulse bg-bg" />,
 })
 
-type Member = { id: string; name: string; email: string; role: string; leaving?: boolean }
+type Member = { id: string; name: string; email: string; role: string; leaving?: boolean; claimed?: boolean }
 type Tier = { minCents: number; maxCents: number | null; requiredApprovals: number }
 type Proposal = {
   id: string
@@ -64,6 +64,7 @@ export function CollectiveTabs(props: {
   exitPolicy: string
   maxMembers: number
   inviteCode: string | null
+  isDemo: boolean
   goals: GoalProgress[]
   events: ActivityEvent[]
   members: Member[]
@@ -209,7 +210,10 @@ export function CollectiveTabs(props: {
                 ) : undefined
               }
             >
-              <MembersPanel members={props.members} />
+              <MembersPanel
+                members={props.members}
+                links={props.isDemo ? null : { collectiveId: props.collectiveId, viewerId: props.viewerId, isAdmin: props.viewerRole === 'ADMIN' }}
+              />
             </CollapsibleSection>
             <CollapsibleSection title="Rules & governance">
               <RulesPanel
@@ -506,7 +510,9 @@ function RequestCard({
   )
 }
 
-function MembersPanel({ members }: { members: Member[] }) {
+type Links = { collectiveId: string; viewerId: string; isAdmin: boolean }
+
+function MembersPanel({ members, links }: { members: Member[]; links: Links | null }) {
   return (
     <div className="card divide-y divide-line">
       {members.map((m) => (
@@ -517,9 +523,60 @@ function MembersPanel({ members }: { members: Member[] }) {
             <div className="truncate text-xs text-muted">{m.email}</div>
           </div>
           {m.leaving && <span className="pill pill-amber">Leaving · refund pending</span>}
+          {links && (m.id === links.viewerId || (links.isAdmin && !m.claimed)) && <SignInLink links={links} memberId={m.id} mine={m.id === links.viewerId} />}
           <RoleBadge role={m.role} />
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Personal sign-in links (treasuries people create). Your own link opens the
+ * treasury as you on another device. The admin copies a new member's link for
+ * them; once that member has opened it, only they can.
+ */
+function SignInLink({ links, memberId, mine }: { links: Links; memberId: string; mine: boolean }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'copied' | 'reset'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  async function copy(get: () => Promise<{ ok: true; path: string } | { ok: false; error: string }>, done: 'copied' | 'reset') {
+    setState('busy')
+    setError(null)
+    const r = await get()
+    if (!r.ok) {
+      setError(r.error)
+      setState('idle')
+      return
+    }
+    await navigator.clipboard.writeText(`${location.origin}${r.path}`).catch(() => {})
+    setState(done)
+    setTimeout(() => setState('idle'), 2500)
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 text-xs">
+      {error && <span className="text-red">{error}</span>}
+      <button
+        type="button"
+        disabled={state === 'busy'}
+        onClick={() => copy(() => personalLink(links.collectiveId, memberId), 'copied')}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium text-blue hover:bg-blue-soft"
+        title={mine ? 'Opens this treasury as you on another device. Keep it private.' : 'Send this to them. It signs them in as themselves.'}
+      >
+        {state === 'copied' || state === 'reset' ? <Check size={13} /> : <Link2 size={13} />}
+        {state === 'copied' ? 'Copied' : state === 'reset' ? 'New link copied' : mine ? 'My sign-in link' : 'Copy sign-in link'}
+      </button>
+      {mine && state === 'idle' && (
+        <button
+          type="button"
+          onClick={() => copy(() => resetMyLink(links.collectiveId), 'reset')}
+          className="rounded-md px-1.5 py-1 text-muted hover:text-ink"
+          title="Make a new link. The old one, and anywhere it was used, stops working."
+        >
+          Reset
+        </button>
+      )}
     </div>
   )
 }

@@ -9,10 +9,13 @@ type Member = { id: string; name: string; role: string }
 
 export function ViewerSwitcher({
   collectiveId,
+  canSwitch,
   viewerId,
   members,
 }: {
   collectiveId: string
+  /** Demos only. In a treasury people created you are always yourself. */
+  canSwitch: boolean
   viewerId: string
   members: Member[]
 }) {
@@ -44,6 +47,19 @@ export function ViewerSwitcher({
   // Officers first, then members, so approvers are easy to find in the demo.
   const order = { ADMIN: 0, APPROVER: 1, MEMBER: 2 } as Record<string, number>
   const sorted = [...members].sort((a, b) => order[a.role] - order[b.role])
+
+  if (!canSwitch)
+    return (
+      <div className="card flex shrink-0 items-center gap-2 py-1 pl-1 pr-2.5">
+        <Avatar name={viewer.name} size={28} />
+        <div className="min-w-0">
+          <div className="whitespace-nowrap text-sm font-medium leading-tight">{viewer.name}</div>
+          <div className="mt-0.5">
+            <RoleBadge role={viewer.role} />
+          </div>
+        </div>
+      </div>
+    )
 
   return (
     <div ref={ref} className="relative flex shrink-0 items-center gap-2">

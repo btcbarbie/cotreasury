@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import { computeTreasury } from './treasury'
@@ -8,6 +9,24 @@ import { reconcileInBackground } from './reconcile'
 
 export function viewerCookieName(collectiveId: string) {
   return `tp_viewer_${collectiveId}`
+}
+
+/** A personal sign-in link token for a member of a treasury people created. */
+export function newAccessToken() {
+  return randomBytes(24).toString('base64url')
+}
+
+export const VIEWER_COOKIE_OPTIONS = { path: '/', sameSite: 'lax', httpOnly: true, maxAge: 60 * 60 * 24 * 180 } as const
+
+/**
+ * Which member this browser is. Demos store the member id (anyone may switch).
+ * Treasuries people create store the member's secret token, so nobody can act
+ * as someone else by guessing an id. Members from before tokens existed are
+ * still recognised by id until they get one.
+ */
+function matchViewer<M extends { id: string; accessToken: string | null }>(members: M[], value: string | undefined, isDemo: boolean) {
+  if (!value) return undefined
+  return isDemo ? members.find((m) => m.id === value) : members.find((m) => (m.accessToken ? m.accessToken === value : m.id === value))
 }
 
 export const MY_TREASURIES_COOKIE = 'ct_mine'
@@ -92,14 +111,13 @@ export async function getCollectiveView(id: string) {
   })
   if (!collective) return null
 
-  // Demo identity: who is "logged in" is a per-collective cookie. Defaults to
-  // the collective's admin so a first-time visitor lands on the full view.
+  // Who is "signed in" is a per-treasury cookie. In demos it defaults to the
+  // admin (and anyone can switch); in treasuries people create there is no
+  // default: you're only someone if your browser was signed in as them.
   const jar = await cookies()
-  const viewerId = jar.get(viewerCookieName(id))?.value
   const viewer =
-    collective.members.find((m) => m.id === viewerId) ??
-    collective.members.find((m) => m.role === 'ADMIN') ??
-    collective.members[0]
+    matchViewer(collective.members, jar.get(viewerCookieName(id))?.value, collective.isDemo) ??
+    (collective.isDemo ? (collective.members.find((m) => m.role === 'ADMIN') ?? collective.members[0]) : null)
 
   return {
     collective,
@@ -113,7 +131,11 @@ export type CollectiveView = NonNullable<Awaited<ReturnType<typeof getCollective
 /** Resolve the acting member for API routes (same demo cookie as the page). */
 export async function getViewer(collectiveId: string) {
   const jar = await cookies()
-  const viewerId = jar.get(viewerCookieName(collectiveId))?.value
-  const members = await prisma.member.findMany({ where: { collectiveId, role: { not: 'FORMER' } }, orderBy: { createdAt: 'asc' } })
-  return members.find((m) => m.id === viewerId) ?? members.find((m) => m.role === 'ADMIN') ?? members[0] ?? null
+  const [members, c] = await Promise.all([
+    prisma.member.findMany({ where: { collectiveId, role: { not: 'FORMER' } }, orderBy: { createdAt: 'asc' } }),
+    prisma.collective.findUnique({ where: { id: collectiveId }, select: { isDemo: true } }),
+  ])
+  const me = matchViewer(members, jar.get(viewerCookieName(collectiveId))?.value, !!c?.isDemo)
+  if (me || !c?.isDemo) return me ?? null
+  return members.find((m) => m.role === 'ADMIN') ?? members[0] ?? null
 }

@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto'
 import { cookies } from 'next/headers'
 import { refresh } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getViewer, viewerCookieName } from '@/lib/collectives'
+import { getViewer, newAccessToken, viewerCookieName, VIEWER_COOKIE_OPTIONS } from '@/lib/collectives'
 import { canApprove, computeTreasury } from '@/lib/treasury'
 import { assessSpend, describeRuleChange, ruleChangeApprovals, validateRules, type RulesPayload } from '@/lib/governance'
 import type { DraftRequest } from '@/lib/treasurer'
@@ -21,8 +21,8 @@ import { formatMoney } from '@/lib/money'
 // Demo-mode identity switch: lets a judge act as different members (e.g. three
 // approvers) without separate logins. Not an authentication mechanism.
 export async function switchViewer(collectiveId: string, memberId: string) {
-  const member = await prisma.member.findFirst({ where: { id: memberId, collectiveId } })
-  if (!member) throw new Error('Member not found')
+  const member = await prisma.member.findFirst({ where: { id: memberId, collectiveId, collective: { isDemo: true } } })
+  if (!member) throw new Error('Only demo treasuries let you switch members.')
   const jar = await cookies()
   jar.set(viewerCookieName(collectiveId), member.id, { path: '/', sameSite: 'lax', httpOnly: true })
 }
@@ -662,6 +662,38 @@ export async function addMember(collectiveId: string, input: { name: string; ema
   if (!r.ok) return r
   refresh()
   return { ok: true }
+}
+
+/**
+ * A personal sign-in link (treasuries people create; demos switch instead).
+ * Your own link, any time. The admin can copy a member's link only until that
+ * member has opened it, so nobody keeps a way to act as someone else.
+ */
+export async function personalLink(collectiveId: string, memberId: string): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  const viewer = await getViewer(collectiveId)
+  const member = await prisma.member.findFirst({ where: { id: memberId, collectiveId, role: { not: 'FORMER' }, collective: { isDemo: false } } })
+  if (!viewer || !member) return { ok: false, error: 'Member not found.' }
+  const mine = member.id === viewer.id
+  if (!mine && !(viewer.role === 'ADMIN' && !member.accessClaimed)) return { ok: false, error: 'Only they can share their link.' }
+  let token = member.accessToken
+  if (!token) {
+    token = newAccessToken()
+    await prisma.member.update({ where: { id: member.id }, data: { accessToken: token, ...(mine ? { accessClaimed: true } : {}) } })
+    // Members from before personal links were signed in by id; move this browser to the token.
+    if (mine) (await cookies()).set(viewerCookieName(collectiveId), token, VIEWER_COOKIE_OPTIONS)
+  }
+  return { ok: true, path: `/m/${token}` }
+}
+
+/** Replace your personal link: the old one, and every browser signed in with it, stop working. */
+export async function resetMyLink(collectiveId: string): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  const viewer = await getViewer(collectiveId)
+  const c = await prisma.collective.findUnique({ where: { id: collectiveId }, select: { isDemo: true } })
+  if (!viewer || !c || c.isDemo) return { ok: false, error: 'Not available here.' }
+  const token = newAccessToken()
+  await prisma.member.update({ where: { id: viewer.id }, data: { accessToken: token, accessClaimed: true } })
+  ;(await cookies()).set(viewerCookieName(collectiveId), token, VIEWER_COOKIE_OPTIONS)
+  return { ok: true, path: `/m/${token}` }
 }
 
 /** Admin: create or reset the invite link (the old one stops working), or turn it off. */

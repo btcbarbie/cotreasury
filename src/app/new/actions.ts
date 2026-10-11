@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { MY_TREASURIES_COOKIE, myTreasuryIds, viewerCookieName } from '@/lib/collectives'
+import { MY_TREASURIES_COOKIE, myTreasuryIds, newAccessToken, viewerCookieName, VIEWER_COOKIE_OPTIONS } from '@/lib/collectives'
 import { validateRules } from '@/lib/governance'
 import { defaultMemberLimit, MEMBER_LIMIT_MAX } from '@/lib/limits'
 import { recordEvent } from '@/lib/audit'
@@ -71,7 +71,11 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
       maxMembers,
       tiers: { create: tiers.map((t) => ({ minCents: t.minCents, maxCents: t.maxCents, requiredApprovals: t.requiredApprovals })) },
       members: {
-        create: [{ name: creator.name, email: creator.email, role: 'ADMIN' }, ...people],
+        // Everyone gets a personal sign-in link; the creator is signed in here, the rest get theirs from the admin.
+        create: [
+          { name: creator.name, email: creator.email, role: 'ADMIN', accessToken: newAccessToken(), accessClaimed: true },
+          ...people.map((p) => ({ ...p, accessToken: newAccessToken() })),
+        ],
       },
     },
     include: { members: true },
@@ -96,7 +100,7 @@ export async function createTreasury(input: NewTreasury): Promise<{ ok: false; e
   const jar = await cookies()
   const mine = [...new Set([...(await myTreasuryIds()), collective.id])].slice(-20)
   jar.set(MY_TREASURIES_COOKIE, mine.join(','), { path: '/', sameSite: 'lax', httpOnly: true, maxAge: 60 * 60 * 24 * 180 })
-  jar.set(viewerCookieName(collective.id), admin.id, { path: '/', sameSite: 'lax', httpOnly: true })
+  jar.set(viewerCookieName(collective.id), admin.accessToken!, VIEWER_COOKIE_OPTIONS)
 
   redirect(`/c/${collective.id}?created=1`)
 }
