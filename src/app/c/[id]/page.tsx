@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { connection } from 'next/server'
 import Link from 'next/link'
 import { Archive, ArrowDownLeft, ArrowUpRight, ChevronLeft, PartyPopper, Clock, Landmark, Wallet } from 'lucide-react'
@@ -46,6 +46,8 @@ async function CollectiveContent({
   const view = await getCollectiveView(id)
   if (!view) notFound()
   const { collective, viewer, treasury } = view
+  // A demo template is never changed directly: each browser works in its own copy.
+  if (collective.isDemo && !collective.demoOwner && collective.demoKey) redirect(`/demo/${collective.demoKey}`)
   const ownAccount = hasOwnAccount(collective.paypalAccount)
   const account = await getMerchantAccount(collective.paypalAccount)
   const notifications = await unseenFor(collective.id, viewer)

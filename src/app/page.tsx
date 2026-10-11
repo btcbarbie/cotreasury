@@ -1,8 +1,9 @@
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { Suspense } from 'react'
 import { connection } from 'next/server'
 import { ArrowRight, ArrowUpRight, BadgeCheck, BookOpen, Briefcase, GraduationCap, HandHeart, Heart, Link2, Plane, Plus, Scale, Send, ShieldCheck, ShoppingBag, Sparkles, Trophy, Users } from 'lucide-react'
-import { listCollectives, myTreasuryIds } from '@/lib/collectives'
+import { listCollectives, myTreasuryIds, VISITOR_COOKIE } from '@/lib/collectives'
 import { formatMoney } from '@/lib/money'
 
 const KIND_META: Record<string, { label: string; Icon: typeof Users; tone: string; bar: string }> = {
@@ -234,7 +235,10 @@ async function MyTreasuries() {
 
 async function DemoGrid() {
   await connection() // live balances: never prerender this list at build time
-  return <TreasuryGrid collectives={await listCollectives({ demo: true })} demo />
+  // Each browser has its own private copies; show those once they exist.
+  const visitor = (await cookies()).get(VISITOR_COOKIE)?.value
+  const [templates, mine] = await Promise.all([listCollectives({ demo: true }), visitor ? listCollectives({ demoFor: visitor }) : []])
+  return <TreasuryGrid collectives={templates.map((t) => mine.find((m) => m.demoKey === t.demoKey) ?? t)} demo />
 }
 
 function TreasuryGrid({ collectives, demo }: { collectives: Awaited<ReturnType<typeof listCollectives>>; demo?: boolean }) {
@@ -256,11 +260,11 @@ function TreasuryGrid({ collectives, demo }: { collectives: Awaited<ReturnType<t
                 {meta.label}
                 {c.status !== 'OPEN' && <span className="pill pill-gray !h-[20px] !text-[11px]">{c.status === 'CLOSED' ? 'Closed' : 'Closing'}</span>}
               </div>
-              <Link href={`/c/${c.id}`} aria-label={`Open ${c.name}`}>
+              <Link href={demo && c.demoKey ? `/demo/${c.demoKey}` : `/c/${c.id}`} aria-label={`Open ${c.name}`} prefetch={false}>
                 <ArrowUpRight size={16} className="text-faint transition group-hover:text-ink" />
               </Link>
             </div>
-            <Link href={`/c/${c.id}`} className="mt-3 text-lg font-semibold tracking-tight hover:underline">
+            <Link href={demo && c.demoKey ? `/demo/${c.demoKey}` : `/c/${c.id}`} prefetch={false} className="mt-3 text-lg font-semibold tracking-tight hover:underline">
               {c.name}
             </Link>
             <p className="mt-1 text-sm text-muted line-clamp-2">{c.purpose}</p>
@@ -280,12 +284,12 @@ function TreasuryGrid({ collectives, demo }: { collectives: Awaited<ReturnType<t
             </div>
             {demo && c.admin ? (
               <div className="mt-5 flex flex-wrap items-center gap-3">
-                <a href={`/c/${c.id}/as/${c.admin.id}`} className="btn btn-primary !h-9">
+                <a href={`/demo/${c.demoKey}?as=admin`} className="btn btn-primary !h-9">
                   Open as {c.admin.name.split(' ')[0]}, admin
                 </a>
-                <Link href={`/c/${c.id}`} className="text-sm text-muted hover:text-ink">
+                <a href={`/demo/${c.demoKey}`} className="text-sm text-muted hover:text-ink">
                   View as another member →
-                </Link>
+                </a>
               </div>
             ) : (
               <Link href={`/c/${c.id}`} className="btn btn-ghost mt-5 !h-9 w-fit">

@@ -28,6 +28,9 @@ model Collective {
   // Stable id of a showcase treasury (e.g. "LISBON"), so renaming it never
   // makes startup seed a second copy.
   demoKey     String?
+  // A browser's private copy of a demo (the visitor cookie it belongs to).
+  // Templates have none; copies keep visitors from affecting each other.
+  demoOwner   String?
   // Who reviews spending: "FIXED" approvers, a "RANDOM" hidden panel drawn
   // from all members, or "MIXED" (one seat from the approvers, the rest random).
   approvalMode String  @default("FIXED")
@@ -60,6 +63,7 @@ model Collective {
   events      AuditEvent[]
 
   @@index([inviteCode])
+  @@index([demoOwner])
 }
 
 model Member {

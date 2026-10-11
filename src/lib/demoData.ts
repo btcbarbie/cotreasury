@@ -49,7 +49,7 @@ type DemoSeed = {
     goals: { title: string; kind: 'TARGET' | 'MONTHLY'; perMemberCents: number; dueInDays?: number; startedDaysAgo?: number }[]
 }
 
-async function createCollective(prisma: PrismaClient, data: DemoSeed) {
+async function createCollective(prisma: PrismaClient, data: DemoSeed, demoOwner: string | null = null) {
   const collective = await prisma.collective.create({
     data: {
       name: data.name,
@@ -62,6 +62,7 @@ async function createCollective(prisma: PrismaClient, data: DemoSeed) {
       paypalEmail: data.paypalEmail,
       isDemo: true,
       demoKey: data.demoKey,
+      demoOwner,
       tiers: { create: data.tiers },
       members: {
         create: data.members.map((m, i) => ({
@@ -181,7 +182,7 @@ function outsideMovementEvent(e: { id: string; amountCents: number; memo: string
 
 /** Demos created before these examples existed get their story's examples once, each with its member alert. */
 async function backfillOutsideMovements(prisma: PrismaClient, seed: DemoSeed) {
-  const c = await prisma.collective.findFirst({ where: { isDemo: true, demoKey: seed.demoKey }, select: { id: true, currency: true } })
+  const c = await prisma.collective.findFirst({ where: { isDemo: true, demoKey: seed.demoKey, demoOwner: null }, select: { id: true, currency: true } })
   if (!c) return
   if (await prisma.ledgerEntry.count({ where: { collectiveId: c.id, type: 'UNAPPROVED_MOVEMENT' } })) return
   for (const o of seed.outside) {
@@ -393,7 +394,7 @@ export async function createDemoCollectives(prisma: PrismaClient) {
 export async function ensureDemoCollectives(prisma: PrismaClient) {
   // 1. Give demos created before demoKey existed their key: by exact name, by a
   //    renamed name that still starts with the original, or by PayPal account key.
-  const unkeyed = await prisma.collective.findMany({ where: { isDemo: true, demoKey: null }, select: { id: true, name: true, paypalAccount: true } })
+  const unkeyed = await prisma.collective.findMany({ where: { isDemo: true, demoKey: null, demoOwner: null }, select: { id: true, name: true, paypalAccount: true } })
   for (const c of unkeyed) {
     const seed =
       DEMO_SEEDS.find((d) => d.name === c.name) ??
@@ -405,31 +406,45 @@ export async function ensureDemoCollectives(prisma: PrismaClient) {
   // 2. One showcase treasury per key: keep the oldest (the original, even if
   //    renamed); drop copies an earlier name-based startup check created.
   for (const seed of DEMO_SEEDS) {
-    const copies = await prisma.collective.findMany({ where: { isDemo: true, demoKey: seed.demoKey }, orderBy: { createdAt: 'asc' }, select: { id: true } })
+    const copies = await prisma.collective.findMany({ where: { isDemo: true, demoKey: seed.demoKey, demoOwner: null }, orderBy: { createdAt: 'asc' }, select: { id: true } })
     if (copies.length > 1) await prisma.collective.deleteMany({ where: { id: { in: copies.slice(1).map((c) => c.id) } } })
   }
 
   // 3. Demos created before these settings existed get their story's values.
   for (const seed of DEMO_SEEDS) {
-    const where = { isDemo: true, demoKey: seed.demoKey }
+    const where = { isDemo: true, demoKey: seed.demoKey, demoOwner: null }
     await prisma.collective.updateMany({ where: { ...where, exitPolicy: 'VOTE', status: 'OPEN' }, data: { exitPolicy: seed.exitPolicy } })
     await prisma.collective.updateMany({ where: { ...where, maxMembers: 50 }, data: { maxMembers: seed.maxMembers } })
     await prisma.collective.updateMany({ where: { ...where, paypalAccount: null }, data: { paypalAccount: seed.paypalAccount } })
   }
   // Story updates (2026-10-11): Brightline refunds a leaving founder's share;
   // Lisbon reviews payouts with a random hidden panel.
-  await prisma.collective.updateMany({ where: { isDemo: true, demoKey: 'BRIGHTLINE', exitPolicy: 'NO_REFUNDS' }, data: { exitPolicy: 'UNSPENT_SHARE' } })
-  await prisma.collective.updateMany({ where: { isDemo: true, demoKey: 'LISBON', approvalMode: 'FIXED' }, data: { approvalMode: 'RANDOM' } })
+  await prisma.collective.updateMany({ where: { isDemo: true, demoKey: 'BRIGHTLINE', demoOwner: null, exitPolicy: 'NO_REFUNDS' }, data: { exitPolicy: 'UNSPENT_SHARE' } })
+  await prisma.collective.updateMany({ where: { isDemo: true, demoKey: 'LISBON', demoOwner: null, approvalMode: 'FIXED' }, data: { approvalMode: 'RANDOM' } })
   for (const seed of DEMO_SEEDS) await backfillOutsideMovements(prisma, seed)
 
   // 4. Seed any showcase treasury that's missing (by key, never by name).
-  const existing = new Set((await prisma.collective.findMany({ where: { isDemo: true, demoKey: { not: null } }, select: { demoKey: true } })).map((c) => c.demoKey))
+  const existing = new Set((await prisma.collective.findMany({ where: { isDemo: true, demoKey: { not: null }, demoOwner: null }, select: { demoKey: true } })).map((c) => c.demoKey))
   const created: string[] = []
   for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.demoKey))) {
     await createCollective(prisma, seed)
     created.push(seed.name)
   }
   return created
+}
+
+/** This browser's private copy of a demo story, made fresh from the template's seed. */
+export async function createDemoCopy(prisma: PrismaClient, demoKey: string, owner: string) {
+  const seed = DEMO_SEEDS.find((d) => d.demoKey === demoKey)
+  if (!seed) return null
+  return createCollective(prisma, seed, owner)
+}
+
+/** Private demo copies older than 30 days are removed (visitors get a fresh one next time). */
+export async function cleanUpDemoCopies(prisma: PrismaClient) {
+  const cutoff = new Date(Date.now() - 30 * DAY)
+  const { count } = await prisma.collective.deleteMany({ where: { isDemo: true, demoOwner: { not: null }, createdAt: { lt: cutoff } } })
+  return count
 }
 
 /** Seal the activity history for a demo that doesn't have one yet. */

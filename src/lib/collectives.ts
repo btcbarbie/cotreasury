@@ -11,6 +11,8 @@ export function viewerCookieName(collectiveId: string) {
 }
 
 export const MY_TREASURIES_COOKIE = 'ct_mine'
+/** Identifies a browser: its private demo copies and its AI question allowance. */
+export const VISITOR_COOKIE = 'ct_visitor'
 
 /** Treasury ids this browser created (demo-mode ownership; not authentication). */
 export async function myTreasuryIds(): Promise<string[]> {
@@ -18,9 +20,9 @@ export async function myTreasuryIds(): Promise<string[]> {
   return (jar.get(MY_TREASURIES_COOKIE)?.value ?? '').split(',').filter(Boolean)
 }
 
-export async function listCollectives(filter: { demo: true } | { ids: string[] }) {
+export async function listCollectives(filter: { demo: true } | { demoFor: string } | { ids: string[] }) {
   const collectives = await prisma.collective.findMany({
-    where: 'demo' in filter ? { isDemo: true } : { id: { in: filter.ids }, isDemo: false },
+    where: 'demo' in filter ? { isDemo: true, demoOwner: null } : 'demoFor' in filter ? { isDemo: true, demoOwner: filter.demoFor } : { id: { in: filter.ids }, isDemo: false },
     orderBy: { createdAt: 'asc' },
     include: {
       entries: { select: { direction: true, status: true, amountCents: true } },
@@ -30,7 +32,7 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
     },
   })
   // Demos follow the showcase order (the business story first); others oldest first.
-  if ('demo' in filter) {
+  if ('demo' in filter || 'demoFor' in filter) {
     const rank = (key: string | null) => (key ? DEMO_ORDER.indexOf(key) + 1 : 0) || DEMO_ORDER.length + 1
     collectives.sort((a, b) => rank(a.demoKey) - rank(b.demoKey))
   }
@@ -39,6 +41,7 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
     name: c.name,
     purpose: c.purpose,
     kind: c.kind,
+    demoKey: c.demoKey,
     status: c.status,
     currency: c.currency,
     memberCount: c._count.members,
