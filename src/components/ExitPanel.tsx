@@ -243,7 +243,7 @@ function CloseForm({
         )
       ) : (
         <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr]">
-          <input className="input" placeholder="Who gets what’s left, e.g. Maya Thompson" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" placeholder="Who gets what’s left, e.g. a charity or the company" value={name} onChange={(e) => setName(e.target.value)} />
           <div className="flex">
             <select className="input !w-auto shrink-0 rounded-r-none border-r-0 !pr-7" aria-label="Send by" value={type} onChange={(e) => setType(e.target.value as ReceiverType)}>
               {RECEIVER_TYPES.map((t) => (

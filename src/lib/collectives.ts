@@ -3,6 +3,7 @@ import { prisma } from './prisma'
 import { computeTreasury } from './treasury'
 import { refreshPanels } from './panel'
 import { closeStaleRequests } from './voting'
+import { DEMO_NAMES } from './demoData'
 import { reconcileInBackground } from './reconcile'
 
 export function viewerCookieName(collectiveId: string) {
@@ -28,6 +29,11 @@ export async function listCollectives(filter: { demo: true } | { ids: string[] }
       members: { where: { role: 'ADMIN' }, select: { id: true, name: true }, take: 1 },
     },
   })
+  // Demos follow the showcase order (the business story first); others oldest first.
+  if ('demo' in filter) {
+    const rank = (name: string) => (DEMO_NAMES.indexOf(name) + 1 || DEMO_NAMES.length + 1)
+    collectives.sort((a, b) => rank(a.name) - rank(b.name))
+  }
   return collectives.map((c) => ({
     id: c.id,
     name: c.name,

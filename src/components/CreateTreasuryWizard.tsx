@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { ArrowLeft, ArrowRight, Check, GraduationCap, HandHeart, Heart, Loader2, Plane, Plus, ShieldCheck, Sparkles, Trash2, Trophy, Users, Wallet } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Briefcase, GraduationCap, HandHeart, Heart, Loader2, Plane, Plus, ShieldCheck, Sparkles, Trash2, Trophy, Users, Wallet } from 'lucide-react'
 import { createTreasury, type NewTreasury } from '@/app/new/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar } from './ui'
@@ -14,6 +14,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const KINDS = [
   { id: 'SCHOLARSHIP_FUND', label: 'Scholarship fund', hint: 'Award money to students', Icon: GraduationCap, tone: 'bg-violet-soft text-violet', placeholder: 'Riverside Alumni Scholarship Fund' },
+  { id: 'BUSINESS', label: 'Business', hint: 'Founders, partners, co-ops', Icon: Briefcase, tone: 'bg-ink/5 text-ink', placeholder: 'Brightline Labs — Founders’ Fund' },
   { id: 'GROUP_TRIP', label: 'Group trip', hint: 'Friends saving to travel', Icon: Plane, tone: 'bg-blue-soft text-blue', placeholder: 'Girls’ Trip to Lisbon' },
   { id: 'HOUSEHOLD', label: 'Household', hint: 'Couples and shared homes', Icon: Heart, tone: 'bg-red-soft text-red', placeholder: 'The Johnsons' },
   { id: 'BOOSTER_CLUB', label: 'Booster club', hint: 'Teams, clubs, school groups', Icon: Trophy, tone: 'bg-amber-soft text-amber', placeholder: 'Lincoln High Robotics Boosters' },
@@ -152,7 +153,7 @@ export function CreateTreasuryWizard() {
                   key={k.id}
                   type="button"
                   onClick={() => setKind(k.id)}
-                  className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${kind === k.id ? 'border-ink bg-bg' : 'border-line hover:border-line-strong'}`}
+                  className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${k.id === 'OTHER' && KINDS.length % 2 === 1 ? 'col-span-2' : ''} ${kind === k.id ? 'border-ink bg-bg' : 'border-line hover:border-line-strong'}`}
                 >
                   <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${k.tone}`}>
                     <k.Icon size={16} />

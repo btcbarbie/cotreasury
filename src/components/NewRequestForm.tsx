@@ -59,7 +59,7 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
       </div>
 
       <div className="mt-4 grid gap-3">
-        <input className="input" placeholder="What is it for? e.g. Textbooks for fall semester" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
+        <input className="input" placeholder="What is it for? e.g. Prototype parts" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
         <input className="input" placeholder="Details (optional)" value={description} maxLength={500} onChange={(e) => setDescription(e.target.value)} />
       </div>
 

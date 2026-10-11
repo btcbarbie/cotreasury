@@ -21,6 +21,11 @@ const SUGGESTIONS: Record<string, string[]> = {
     'Are we both up to date this month?',
     'How close are we to the emergency fund goal?',
   ],
+  BUSINESS: [
+    'Can we afford $2,000 for prototype parts?',
+    'Who is behind on the pre-launch budget?',
+    'Who needs to approve a $1,500 spend?',
+  ],
   GROUP_TRIP: [
     'Can we afford a $1,400 apartment deposit?',
     "Who hasn't paid their share yet?",

@@ -9,9 +9,9 @@ import { formatMoney } from './money'
 const DAY = 24 * 60 * 60 * 1000
 
 /** The showcase treasuries every visitor sees. */
-export const DEMO_NAMES = ['The Maya Thompson Scholarship 🎓', "Girls' Trip to Lisbon 🇵🇹", '💍 The Johnsons']
+export const DEMO_NAMES = ['Brightline Labs — Founders’ Fund 🚀', "Girls' Trip to Lisbon 🇵🇹", '💍 The Johnsons']
 /** Earlier demo stories, replaced at startup. */
-export const RETIRED_DEMO_NAMES = ['Whitmore Family Scholarship Fund', 'Westfield Eagles Booster Club']
+export const RETIRED_DEMO_NAMES = ['Whitmore Family Scholarship Fund', 'Westfield Eagles Booster Club', 'The Maya Thompson Scholarship 🎓']
 
 function daysAgo(n: number) {
   return new Date(Date.now() - n * DAY)
@@ -231,50 +231,49 @@ const DEMO_SEEDS: DemoSeed[] = [
   {
     name: DEMO_NAMES[0],
     purpose:
-      "Help us give Maya a chance to start college without carrying the whole burden herself. Maya has been accepted to Howard University. We're a group of family friends and former classmates putting money together to help cover her first year. Everyone can see what has come in, what's been approved, and what's been paid.",
-    kind: 'SCHOLARSHIP_FUND',
+      'Three co-founders, one pre-launch budget. We’re pooling our own money to build Brightline before we incorporate: software, legal fees and our first prototype. Every spend over $500 needs two of us to agree.',
+    kind: 'BUSINESS',
     exitPolicy: 'NO_REFUNDS',
-    maxMembers: 25,
-    paypalAccount: 'MAYA',
-    paypalEmail: 'maya.scholarship@example.com',
-    domain: 'friends.example',
+    maxMembers: 5,
+    paypalAccount: 'MAYA', // this demo's own sandbox business account (the key kept from the earlier story)
+    paypalEmail: 'founders@brightline.example',
+    domain: 'brightline.example',
     members: [
-      { name: 'Angela Brooks', role: 'ADMIN' },
-      { name: 'Marcus Reed', role: 'APPROVER' },
-      { name: 'Keisha Johnson', role: 'APPROVER' },
-      { name: 'David Kim', role: 'APPROVER' },
-      { name: 'Tiana Williams' },
-      { name: 'Jordan Ellis' },
-      { name: 'Olivia Grant' },
-      { name: 'Brandon Hayes' },
-      { name: 'Naomi Foster' },
-      { name: 'Chris Adeyemi' },
+      { name: 'Ethan Brooks', role: 'ADMIN' },
+      { name: 'Priya Raman', role: 'APPROVER' },
+      { name: 'Marcus Chen', role: 'APPROVER' },
     ],
     tiers: [
       { minCents: 0, maxCents: 50_000, requiredApprovals: 1 },
-      { minCents: 50_000, maxCents: 300_000, requiredApprovals: 2 },
-      { minCents: 300_000, maxCents: null, requiredApprovals: 3 },
+      { minCents: 50_000, maxCents: null, requiredApprovals: 2 },
     ],
     openingCents: 0,
-    openingDaysAgo: 70,
+    openingDaysAgo: 80,
     goals: [
-      { title: 'First-year tuition gap', kind: 'TARGET', perMemberCents: 60_000, dueInDays: 35 },
-      { title: 'Books & laptop', kind: 'TARGET', perMemberCents: 10_000, dueInDays: 20 },
+      { title: 'Pre-launch budget', kind: 'TARGET', perMemberCents: 500_000, dueInDays: 45 },
+      { title: 'Tools & hosting', kind: 'MONTHLY', perMemberCents: 15_000, startedDaysAgo: 80 },
     ],
     contributions: [
-      { member: 'Angela Brooks', cents: 60_000, daysAgo: 64, goal: 'First-year tuition gap' },
-      { member: 'Marcus Reed', cents: 60_000, daysAgo: 60, goal: 'First-year tuition gap' },
-      { member: 'Keisha Johnson', cents: 30_000, daysAgo: 55, memo: 'First half', goal: 'First-year tuition gap' },
-      { member: 'David Kim', cents: 60_000, daysAgo: 50, goal: 'First-year tuition gap' },
-      { member: 'Tiana Williams', cents: 25_000, daysAgo: 41, memo: 'From our old study group', goal: 'First-year tuition gap' },
-      { member: 'Jordan Ellis', cents: 10_000, daysAgo: 33, goal: 'Books & laptop' },
-      { member: 'Olivia Grant', cents: 60_000, daysAgo: 27, memo: 'Matched by my employer', goal: 'First-year tuition gap' },
-      { member: 'Brandon Hayes', cents: 10_000, daysAgo: 19, goal: 'Books & laptop' },
-      { member: 'Naomi Foster', cents: 15_000, daysAgo: 12, goal: 'First-year tuition gap' },
-      { member: 'Chris Adeyemi', cents: 10_000, daysAgo: 6, goal: 'Books & laptop' },
+      { member: 'Ethan Brooks', cents: 500_000, daysAgo: 78, goal: 'Pre-launch budget' },
+      { member: 'Priya Raman', cents: 500_000, daysAgo: 76, goal: 'Pre-launch budget' },
+      { member: 'Marcus Chen', cents: 300_000, daysAgo: 74, memo: 'First part', goal: 'Pre-launch budget' },
+      { member: 'Ethan Brooks', cents: 15_000, daysAgo: 72, goal: 'Tools & hosting' },
+      { member: 'Priya Raman', cents: 15_000, daysAgo: 72, goal: 'Tools & hosting' },
+      { member: 'Marcus Chen', cents: 15_000, daysAgo: 71, goal: 'Tools & hosting' },
+      { member: 'Ethan Brooks', cents: 15_000, daysAgo: 42, goal: 'Tools & hosting' },
+      { member: 'Priya Raman', cents: 15_000, daysAgo: 41, goal: 'Tools & hosting' },
+      { member: 'Marcus Chen', cents: 15_000, daysAgo: 40, goal: 'Tools & hosting' },
+      { member: 'Marcus Chen', cents: 200_000, daysAgo: 20, memo: 'Second part', goal: 'Pre-launch budget' },
+      { member: 'Ethan Brooks', cents: 15_000, daysAgo: 11, goal: 'Tools & hosting' },
+      { member: 'Priya Raman', cents: 15_000, daysAgo: 10, goal: 'Tools & hosting' },
+      { member: 'Marcus Chen', cents: 15_000, daysAgo: 10, goal: 'Tools & hosting' },
     ],
-    payouts: [{ title: 'Enrollment deposit', to: 'Howard University', cents: 50_000, daysAgo: 30 }],
-    outside: [{ what: 'Withdrawal to a bank account', to: 'Bank account ending 4417', cents: 30_000, daysAgo: 16 }],
+    payouts: [
+      { title: 'Incorporation & legal fees', to: 'Harbor Legal LLP', cents: 185_000, daysAgo: 50 },
+      { title: 'Prototype parts', to: 'Proto Supply Co.', cents: 240_000, daysAgo: 30 },
+      { title: 'Design & dev tools (annual)', to: 'Toolstack Inc.', cents: 60_000, daysAgo: 15 },
+    ],
+    outside: [{ what: 'Payment sent from PayPal', to: 'Ethan Brooks', cents: 35_000, daysAgo: 9 }],
   },
   {
     name: DEMO_NAMES[1],
