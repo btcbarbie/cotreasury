@@ -10,6 +10,8 @@ const DAY = 24 * 60 * 60 * 1000
 
 /** The showcase treasuries every visitor sees. */
 export const DEMO_NAMES = ['Brightline Labs — Founders’ Fund 🚀', "Girls' Trip to Lisbon 🇵🇹", '💍 The Johnsons']
+/** Showcase order on the landing page (by stable key, so renames don't matter). */
+export const DEMO_ORDER = ['BRIGHTLINE', 'LISBON', 'JOHNSONS']
 /** Earlier demo stories, replaced at startup. */
 export const RETIRED_DEMO_NAMES = ['Whitmore Family Scholarship Fund', 'Westfield Eagles Booster Club', 'The Maya Thompson Scholarship 🎓']
 
@@ -24,10 +26,13 @@ function emailFor(name: string, domain: string) {
 }
 
 type DemoSeed = {
+    /** Stable id: survives renames, so a renamed demo is never seeded twice. */
+    demoKey: 'BRIGHTLINE' | 'LISBON' | 'JOHNSONS'
     name: string
     purpose: string
     kind: string
     exitPolicy: 'NO_REFUNDS' | 'UNSPENT_SHARE' | 'VOTE'
+    approvalMode: 'FIXED' | 'RANDOM' | 'MIXED'
     maxMembers: number
     /** Key for this group's own sandbox account: PAYPAL_CLIENT_ID_<KEY> etc. Falls back to the shared one until set. */
     paypalAccount: string
@@ -51,10 +56,12 @@ async function createCollective(prisma: PrismaClient, data: DemoSeed) {
       purpose: data.purpose,
       kind: data.kind,
       exitPolicy: data.exitPolicy,
+      approvalMode: data.approvalMode,
       maxMembers: data.maxMembers,
       paypalAccount: data.paypalAccount,
       paypalEmail: data.paypalEmail,
       isDemo: true,
+      demoKey: data.demoKey,
       tiers: { create: data.tiers },
       members: {
         create: data.members.map((m, i) => ({
@@ -174,7 +181,7 @@ function outsideMovementEvent(e: { id: string; amountCents: number; memo: string
 
 /** Demos created before these examples existed get their story's examples once, each with its member alert. */
 async function backfillOutsideMovements(prisma: PrismaClient, seed: DemoSeed) {
-  const c = await prisma.collective.findFirst({ where: { isDemo: true, name: seed.name }, select: { id: true, currency: true } })
+  const c = await prisma.collective.findFirst({ where: { isDemo: true, demoKey: seed.demoKey }, select: { id: true, currency: true } })
   if (!c) return
   if (await prisma.ledgerEntry.count({ where: { collectiveId: c.id, type: 'UNAPPROVED_MOVEMENT' } })) return
   for (const o of seed.outside) {
@@ -229,11 +236,13 @@ export async function writeDemoHistory(prisma: PrismaClient, collectiveId: strin
 
 const DEMO_SEEDS: DemoSeed[] = [
   {
+    demoKey: 'BRIGHTLINE',
     name: DEMO_NAMES[0],
     purpose:
       'Three co-founders, one pre-launch budget. We’re pooling our own money to build Brightline before we incorporate: software, legal fees and our first prototype. Every spend over $500 needs two of us to agree.',
     kind: 'BUSINESS',
-    exitPolicy: 'NO_REFUNDS',
+    exitPolicy: 'UNSPENT_SHARE',
+    approvalMode: 'FIXED', // all three founders are the approvers
     maxMembers: 5,
     paypalAccount: 'MAYA', // this demo's own sandbox business account (the key kept from the earlier story)
     paypalEmail: 'founders@brightline.example',
@@ -276,11 +285,13 @@ const DEMO_SEEDS: DemoSeed[] = [
     outside: [{ what: 'Payment sent from PayPal', to: 'Ethan Brooks', cents: 35_000, daysAgo: 9 }],
   },
   {
+    demoKey: 'LISBON',
     name: DEMO_NAMES[1],
     purpose:
       "Eight of us. One trip. One place to keep the money together. We're finally doing the trip we've been talking about for years. Everyone is putting in what they can, and we're using this treasury to keep contributions, bookings, and spending in one place.",
     kind: 'GROUP_TRIP',
     exitPolicy: 'UNSPENT_SHARE',
+    approvalMode: 'RANDOM', // a hidden panel drawn from all eight for each payout
     maxMembers: 8,
     paypalAccount: 'LISBON',
     paypalEmail: 'lisbon.trip@example.com',
@@ -327,11 +338,13 @@ const DEMO_SEEDS: DemoSeed[] = [
     ],
   },
   {
+    demoKey: 'JOHNSONS',
     name: DEMO_NAMES[2],
     purpose:
       "Long-term partnership. We're building our life together, so we want our finances to work that way too. Both of us can contribute, see what's happening, and make decisions about our shared money without one person having to manage everything alone.",
     kind: 'HOUSEHOLD',
     exitPolicy: 'VOTE',
+    approvalMode: 'FIXED',
     maxMembers: 2,
     paypalAccount: 'JOHNSONS',
     paypalEmail: 'the.johnsons@example.com',
@@ -378,16 +391,41 @@ export async function createDemoCollectives(prisma: PrismaClient) {
 
 /** Seed any showcase treasury that's missing; returns the names it created. */
 export async function ensureDemoCollectives(prisma: PrismaClient) {
-  const existing = new Set((await prisma.collective.findMany({ where: { isDemo: true }, select: { name: true } })).map((c) => c.name))
-  // Demos still on the default policy (created before exit policies existed) get their story's policy.
-  for (const seed of DEMO_SEEDS) {
-    await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, exitPolicy: 'VOTE', status: 'OPEN' }, data: { exitPolicy: seed.exitPolicy } })
-    await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, maxMembers: 50 }, data: { maxMembers: seed.maxMembers } })
-    await prisma.collective.updateMany({ where: { isDemo: true, name: seed.name, paypalAccount: null }, data: { paypalAccount: seed.paypalAccount } })
+  // 1. Give demos created before demoKey existed their key: by exact name, by a
+  //    renamed name that still starts with the original, or by PayPal account key.
+  const unkeyed = await prisma.collective.findMany({ where: { isDemo: true, demoKey: null }, select: { id: true, name: true, paypalAccount: true } })
+  for (const c of unkeyed) {
+    const seed =
+      DEMO_SEEDS.find((d) => d.name === c.name) ??
+      DEMO_SEEDS.find((d) => c.name.startsWith(d.name)) ??
+      DEMO_SEEDS.find((d) => c.paypalAccount && d.paypalAccount === c.paypalAccount && !RETIRED_DEMO_NAMES.includes(c.name))
+    if (seed) await prisma.collective.update({ where: { id: c.id }, data: { demoKey: seed.demoKey } })
   }
+
+  // 2. One showcase treasury per key: keep the oldest (the original, even if
+  //    renamed); drop copies an earlier name-based startup check created.
+  for (const seed of DEMO_SEEDS) {
+    const copies = await prisma.collective.findMany({ where: { isDemo: true, demoKey: seed.demoKey }, orderBy: { createdAt: 'asc' }, select: { id: true } })
+    if (copies.length > 1) await prisma.collective.deleteMany({ where: { id: { in: copies.slice(1).map((c) => c.id) } } })
+  }
+
+  // 3. Demos created before these settings existed get their story's values.
+  for (const seed of DEMO_SEEDS) {
+    const where = { isDemo: true, demoKey: seed.demoKey }
+    await prisma.collective.updateMany({ where: { ...where, exitPolicy: 'VOTE', status: 'OPEN' }, data: { exitPolicy: seed.exitPolicy } })
+    await prisma.collective.updateMany({ where: { ...where, maxMembers: 50 }, data: { maxMembers: seed.maxMembers } })
+    await prisma.collective.updateMany({ where: { ...where, paypalAccount: null }, data: { paypalAccount: seed.paypalAccount } })
+  }
+  // Story updates (2026-10-11): Brightline refunds a leaving founder's share;
+  // Lisbon reviews payouts with a random hidden panel.
+  await prisma.collective.updateMany({ where: { isDemo: true, demoKey: 'BRIGHTLINE', exitPolicy: 'NO_REFUNDS' }, data: { exitPolicy: 'UNSPENT_SHARE' } })
+  await prisma.collective.updateMany({ where: { isDemo: true, demoKey: 'LISBON', approvalMode: 'FIXED' }, data: { approvalMode: 'RANDOM' } })
   for (const seed of DEMO_SEEDS) await backfillOutsideMovements(prisma, seed)
+
+  // 4. Seed any showcase treasury that's missing (by key, never by name).
+  const existing = new Set((await prisma.collective.findMany({ where: { isDemo: true, demoKey: { not: null } }, select: { demoKey: true } })).map((c) => c.demoKey))
   const created: string[] = []
-  for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.name))) {
+  for (const seed of DEMO_SEEDS.filter((d) => !existing.has(d.demoKey))) {
     await createCollective(prisma, seed)
     created.push(seed.name)
   }

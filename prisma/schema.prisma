@@ -25,6 +25,9 @@ model Collective {
   // Seeded showcase treasuries are listed for every visitor; user-created ones
   // only for the browser that created them.
   isDemo      Boolean  @default(false)
+  // Stable id of a showcase treasury (e.g. "LISBON"), so renaming it never
+  // makes startup seed a second copy.
+  demoKey     String?
   // Who reviews spending: "FIXED" approvers, a "RANDOM" hidden panel drawn
   // from all members, or "MIXED" (one seat from the approvers, the rest random).
   approvalMode String  @default("FIXED")
