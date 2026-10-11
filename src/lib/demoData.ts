@@ -9,7 +9,7 @@ import { formatMoney } from './money'
 const DAY = 24 * 60 * 60 * 1000
 
 /** The showcase treasuries every visitor sees. */
-export const DEMO_NAMES = ['Brightline Labs — Founders’ Fund 🚀', "Girls' Trip to Lisbon 🇵🇹", '💍 The Johnsons']
+export const DEMO_NAMES = ['Brightline Labs — Founders’ Fund 🚀', "Girls' Trip to Lisbon 🇵🇹", '💍 The Johnsons Household']
 /** Showcase order on the landing page (by stable key, so renames don't matter). */
 export const DEMO_ORDER = ['BRIGHTLINE', 'LISBON', 'JOHNSONS']
 /** Earlier demo stories, replaced at startup. */
