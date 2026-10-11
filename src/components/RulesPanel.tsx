@@ -91,7 +91,8 @@ export function RulesPanel({
               </span>
             </div>
           ))}
-          <div className="flex items-start justify-between gap-4 py-3 text-sm">
+          {/* Phones: the long labels get the full width and the tag sits underneath. */}
+          <div className="flex flex-col items-start gap-1.5 py-3 text-sm sm:flex-row sm:justify-between sm:gap-4">
             <span>
               Who reviews payouts
               <span className="block text-xs text-muted">
@@ -104,7 +105,7 @@ export function RulesPanel({
             </span>
             <span className="pill pill-violet shrink-0">{MODES.find((m) => m.id === approvalMode)?.label}</span>
           </div>
-          <div className="flex items-start justify-between gap-4 py-3 text-sm">
+          <div className="flex flex-col items-start gap-1.5 py-3 text-sm sm:flex-row sm:justify-between sm:gap-4">
             <span>
               If someone leaves or the group closes
               <span className="block text-xs text-muted">{EXIT_POLICIES.find((p) => p.id === exitPolicy)?.hint}</span>

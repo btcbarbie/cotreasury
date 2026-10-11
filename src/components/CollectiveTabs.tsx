@@ -113,22 +113,32 @@ export function CollectiveTabs(props: {
   return (
     <div id="requests" className="mt-10 scroll-mt-20">
       {/* The four main views: big enough to read as the backbone of the page. */}
-      <div className="no-scrollbar flex gap-1 overflow-x-auto border-b border-line sm:gap-2">
+      {/* Phones: four equal columns, icon above a short label. Wider screens: one row. */}
+      <div className="grid grid-cols-4 border-b border-line sm:flex sm:gap-2">
         {TABS.map((t) => {
           const Icon = TAB_ICONS[t]
           return (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`relative -mb-px flex shrink-0 items-center gap-2 border-b-[3px] px-3 py-3.5 text-base font-semibold tracking-tight transition sm:px-4 sm:text-lg ${
+              className={`relative -mb-px flex min-w-0 flex-col items-center gap-1 border-b-[3px] px-1 py-2.5 text-xs font-semibold tracking-tight transition sm:shrink-0 sm:flex-row sm:gap-2 sm:px-4 sm:py-3.5 sm:text-lg ${
                 tab === t ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
               }`}
             >
               <Icon size={18} className={tab === t ? 'text-accent' : 'text-faint'} />
-              {t}
-              {counts[t] != null && (
-                <span className={`tabular rounded-full px-2 py-0.5 text-xs font-medium ${tab === t ? 'bg-ink text-white' : 'bg-bg text-muted'}`}>{counts[t]}</span>
-              )}
+              <span className="flex items-center gap-1 sm:gap-2">
+                {t === 'Activity log' ? (
+                  <>
+                    <span className="sm:hidden">Activity</span>
+                    <span className="hidden sm:inline">{t}</span>
+                  </>
+                ) : (
+                  t
+                )}
+                {counts[t] != null && (
+                  <span className={`tabular rounded-full px-1.5 py-px text-[10px] font-medium sm:px-2 sm:py-0.5 sm:text-xs ${tab === t ? 'bg-ink text-white' : 'bg-bg text-muted'}`}>{counts[t]}</span>
+                )}
+              </span>
             </button>
           )
         })}

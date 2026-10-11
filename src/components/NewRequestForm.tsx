@@ -77,7 +77,8 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
             >
               <Trash2 size={15} />
             </button>
-            <div className="flex">
+            {/* Phones: name on its own line, then the email/phone, then the amount, each full width. */}
+            <div className="col-span-2 flex sm:col-span-1">
               <select
                 className="input !w-auto shrink-0 rounded-r-none border-r-0 !pr-7 text-sm"
                 aria-label="Send by"
@@ -98,7 +99,7 @@ export function NewRequestForm({ collectiveId, currency, onClose }: { collective
                 onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, receiver: e.target.value } : x)))}
               />
             </div>
-            <div className="relative">
+            <div className="relative col-span-2 sm:col-span-1">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">$</span>
               <input
                 className="input pl-6 tabular"

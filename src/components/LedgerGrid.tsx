@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import {
   AllCommunityModule,
@@ -170,6 +170,15 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
   const [search, setSearch] = useState('')
   const [receiptFor, setReceiptFor] = useState<Row | null>(null)
   const [totals, setTotals] = useState<Totals>({ count: 0, inCents: 0, outCents: 0 })
+  // Phones: drop date, status and balance columns so the amount stays on screen; the date moves under the name.
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const update = () => setNarrow(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
   // Only update when the numbers change, so re-rendering the pinned row can't loop.
   const recalc = (api: GridApi<Row>) => {
     const t = sumFiltered(api)
@@ -199,6 +208,7 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
         headerName: 'DATE',
         width: 110,
         sort: 'desc',
+        hide: narrow,
         cellRenderer: (p: ICellRendererParams<Row>) => {
           const d = new Date(p.value as string)
           return (
@@ -213,7 +223,7 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
         colId: 'entry',
         headerName: 'ENTRY',
         flex: 2,
-        minWidth: 240,
+        minWidth: narrow ? 150 : 240,
         // Searchable text for the quick filter: name + description.
         valueGetter: (p) => `${payee(p.data?.counterparty ?? null) ?? ''} ${p.data?.memo ?? ''} ${TYPE_LABEL[p.data?.type ?? ''] ?? ''}`,
         cellRenderer: (p: ICellRendererParams<Row>) => {
@@ -226,22 +236,23 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
               : r.type === 'OPENING_BALANCE'
                 ? (r.memo ?? 'Carried over')
                 : (r.memo ?? TYPE_LABEL[r.type])
+          const when = narrow ? `${new Date(r.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}${r.status === 'PENDING' ? ' · Pending' : r.status === 'FAILED' ? ' · Failed' : ''} · ` : ''
           return (
             <div className="flex h-full items-center gap-3">
-              <Avatar name={who} size={34} />
+              <Avatar name={who} size={narrow ? 28 : 34} />
               <div className="min-w-0 leading-tight">
                 <div className="truncate font-medium">{who}</div>
-                <div className="truncate text-xs text-muted">{what}</div>
+                <div className="truncate text-xs text-muted">{when}{what}</div>
               </div>
             </div>
           )
         },
       },
-      { colId: 'status', headerName: 'STATUS', width: 260, cellRenderer: (p: ICellRendererParams<Row>) => (p.data ? <StatusCell r={p.data} /> : null) },
+      { colId: 'status', headerName: 'STATUS', width: 260, hide: narrow, cellRenderer: (p: ICellRendererParams<Row>) => (p.data ? <StatusCell r={p.data} /> : null) },
       {
         field: 'amountCents',
         headerName: 'AMOUNT',
-        width: 130,
+        width: narrow ? 108 : 130,
         type: 'rightAligned',
         cellRenderer: (p: ICellRendererParams<Row>) =>
           p.data ? (
@@ -256,14 +267,15 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
         field: 'balanceCents',
         headerName: 'BALANCE AFTER',
         width: 140,
+        hide: narrow,
         type: 'rightAligned',
         cellRenderer: (p: ICellRendererParams<Row>) =>
           p.value == null ? <span className="text-xs text-faint">not counted yet</span> : <span className="tabular font-medium">{formatMoney(p.value as number, currency)}</span>,
       },
       {
         colId: 'receipt',
-        headerName: 'RECEIPT',
-        width: 100,
+        headerName: narrow ? '' : 'RECEIPT',
+        width: narrow ? 56 : 100,
         cellRenderer: (p: ICellRendererParams<Row>) => {
           const r = p.data
           if (!r) return null
@@ -283,7 +295,7 @@ export function LedgerGrid({ entries, currency }: { entries: LedgerRow[]; curren
         },
       },
     ],
-    [currency],
+    [currency, narrow],
   )
 
   // The pinned row carries the current totals; AG Grid re-renders it when they change.
