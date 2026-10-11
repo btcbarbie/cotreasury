@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { AlertTriangle, BookOpen, Check, History, LayoutGrid, Link2, Loader2, RotateCcw, Scale, Send, SlidersHorizontal, UsersRound, X } from 'lucide-react'
-import { decideRequest, refreshCollective, retryRequestPayout, cancelClose, personalLink, resetMyLink } from '@/app/c/[id]/actions'
+import { decideRequest, refreshCollective, retryRequestPayout, cancelClose, personalLink } from '@/app/c/[id]/actions'
 import { formatMoney } from '@/lib/money'
 import { Avatar, RoleBadge } from './ui'
 import { RulesPanel } from './RulesPanel'
@@ -523,7 +523,7 @@ function MembersPanel({ members, links }: { members: Member[]; links: Links | nu
             <div className="truncate text-xs text-muted">{m.email}</div>
           </div>
           {m.leaving && <span className="pill pill-amber">Leaving · refund pending</span>}
-          {links && (m.id === links.viewerId || (links.isAdmin && !m.claimed)) && <SignInLink links={links} memberId={m.id} mine={m.id === links.viewerId} />}
+          {links && links.isAdmin && m.id !== links.viewerId && !m.claimed && <SignInLink collectiveId={links.collectiveId} memberId={m.id} />}
           <RoleBadge role={m.role} />
         </div>
       ))}
@@ -531,26 +531,22 @@ function MembersPanel({ members, links }: { members: Member[]; links: Links | nu
   )
 }
 
-/**
- * Personal sign-in links (treasuries people create). Your own link opens the
- * treasury as you on another device. The admin copies a new member's link for
- * them; once that member has opened it, only they can.
- */
-function SignInLink({ links, memberId, mine }: { links: Links; memberId: string; mine: boolean }) {
-  const [state, setState] = useState<'idle' | 'busy' | 'copied' | 'reset'>('idle')
+/** The admin sends someone they added their sign-in link; once that person opens it, the button goes away. */
+function SignInLink({ collectiveId, memberId }: { collectiveId: string; memberId: string }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'copied'>('idle')
   const [error, setError] = useState<string | null>(null)
 
-  async function copy(get: () => Promise<{ ok: true; path: string } | { ok: false; error: string }>, done: 'copied' | 'reset') {
+  async function copy() {
     setState('busy')
     setError(null)
-    const r = await get()
+    const r = await personalLink(collectiveId, memberId)
     if (!r.ok) {
       setError(r.error)
       setState('idle')
       return
     }
     await navigator.clipboard.writeText(`${location.origin}${r.path}`).catch(() => {})
-    setState(done)
+    setState('copied')
     setTimeout(() => setState('idle'), 2500)
   }
 
@@ -560,23 +556,13 @@ function SignInLink({ links, memberId, mine }: { links: Links; memberId: string;
       <button
         type="button"
         disabled={state === 'busy'}
-        onClick={() => copy(() => personalLink(links.collectiveId, memberId), 'copied')}
+        onClick={copy}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium text-blue hover:bg-blue-soft"
-        title={mine ? 'Opens this treasury as you on another device. Keep it private.' : 'Send this to them. It signs them in as themselves.'}
+        title="Send this to them. It signs them in as themselves."
       >
-        {state === 'copied' || state === 'reset' ? <Check size={13} /> : <Link2 size={13} />}
-        {state === 'copied' ? 'Copied' : state === 'reset' ? 'New link copied' : mine ? 'My sign-in link' : 'Copy sign-in link'}
+        {state === 'copied' ? <Check size={13} /> : <Link2 size={13} />}
+        {state === 'copied' ? 'Copied' : 'Copy sign-in link'}
       </button>
-      {mine && state === 'idle' && (
-        <button
-          type="button"
-          onClick={() => copy(() => resetMyLink(links.collectiveId), 'reset')}
-          className="rounded-md px-1.5 py-1 text-muted hover:text-ink"
-          title="Make a new link. The old one, and anywhere it was used, stops working."
-        >
-          Reset
-        </button>
-      )}
     </div>
   )
 }

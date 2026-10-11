@@ -685,17 +685,6 @@ export async function personalLink(collectiveId: string, memberId: string): Prom
   return { ok: true, path: `/m/${token}` }
 }
 
-/** Replace your personal link: the old one, and every browser signed in with it, stop working. */
-export async function resetMyLink(collectiveId: string): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
-  const viewer = await getViewer(collectiveId)
-  const c = await prisma.collective.findUnique({ where: { id: collectiveId }, select: { isDemo: true } })
-  if (!viewer || !c || c.isDemo) return { ok: false, error: 'Not available here.' }
-  const token = newAccessToken()
-  await prisma.member.update({ where: { id: viewer.id }, data: { accessToken: token, accessClaimed: true } })
-  ;(await cookies()).set(viewerCookieName(collectiveId), token, VIEWER_COOKIE_OPTIONS)
-  return { ok: true, path: `/m/${token}` }
-}
-
 /** Admin: create or reset the invite link (the old one stops working), or turn it off. */
 export async function setInviteLink(collectiveId: string, on: boolean): Promise<Result> {
   const viewer = await getViewer(collectiveId)
