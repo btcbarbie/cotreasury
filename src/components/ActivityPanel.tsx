@@ -1,10 +1,13 @@
 'use client'
 
-import { Landmark, Sparkles } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Landmark, Loader2, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react'
+import { checkIntegrity } from '@/app/c/[id]/actions'
 import { Avatar } from './ui'
 
 export type ActivityEvent = { id: string; seq: number; actor: string; action: string; summary: string; createdAt: string; hash: string }
 
+type Check = Awaited<ReturnType<typeof checkIntegrity>>
 
 /**
  * Plain-language version of an event, for display only: the sealed text is
@@ -75,10 +78,33 @@ function ActorMark({ actor }: { actor: string }) {
   return <Avatar name={actor} size={28} />
 }
 
-export function ActivityPanel({ events }: { events: ActivityEvent[] }) {
+export function ActivityPanel({ collectiveId, events }: { collectiveId: string; events: ActivityEvent[] }) {
+  const [result, setResult] = useState<Check | null>(null)
+  const [pending, start] = useTransition()
 
   return (
     <div className="grid gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <button
+          className="btn btn-ghost !h-8"
+          onClick={() => start(async () => setResult(await checkIntegrity(collectiveId)))}
+          disabled={pending}
+          title="Confirms no past event was edited or deleted"
+        >
+          {pending ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Check integrity
+        </button>
+        {result &&
+          (result.ok ? (
+            <div className="flex w-full items-center gap-2 rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">
+              <ShieldCheck size={16} /> All {result.count} events are intact. Latest seal <span className="font-mono text-xs">{result.head?.slice(0, 16)}</span>
+            </div>
+          ) : (
+            <div className="flex w-full items-center gap-2 rounded-lg bg-red-soft px-3 py-2 text-sm text-red">
+              <ShieldAlert size={16} /> History was altered: {result.reason}
+            </div>
+          ))}
+      </div>
+
       <div className="card divide-y divide-line">
         {events.length === 0 && <div className="px-5 py-10 text-center text-sm text-muted">No activity yet.</div>}
         {events.map((e) => (
