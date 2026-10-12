@@ -74,8 +74,8 @@ approvers to vote on it. Only demos allow switching; a treasury you create is pr
 PayPal sandbox **buyer (personal) account**, for **Add funds**:
 
 ```
-Email:    <SANDBOX BUYER EMAIL>
-Password: <SANDBOX BUYER PASSWORD>
+Email:    sb-68prz53298121@personal.example.com
+Password: O600Ua1/
 ```
 
 If PayPal says the account is “associated with the merchant”, you’re signed in to a business account.
