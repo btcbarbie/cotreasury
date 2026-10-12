@@ -18,6 +18,12 @@ import type { GoalProgress } from '@/lib/goals'
 import type { LedgerRow } from './LedgerGrid'
 import { receiverLabel } from '@/lib/recipients'
 
+// AG Charts touches window on import too: client-side only.
+const MonthlyChart = dynamic(() => import('./MonthlyChart').then((m) => m.MonthlyChart), {
+  ssr: false,
+  loading: () => <div className="card h-[300px] animate-pulse" />,
+})
+
 // AG Grid touches window on import; render it client-side only.
 const LedgerGrid = dynamic(() => import('./LedgerGrid').then((m) => m.LedgerGrid), {
   ssr: false,
@@ -147,6 +153,9 @@ export function CollectiveTabs(props: {
       <div className="mt-5">
         {tab === 'Overview' && (
           <div className="grid gap-10">
+            <CollapsibleSection title="Money in and out, by month">
+              <MonthlyChart entries={props.entries} currency={props.currency} />
+            </CollapsibleSection>
             <OverviewPanel
               collectiveId={props.collectiveId}
               currency={props.currency}
