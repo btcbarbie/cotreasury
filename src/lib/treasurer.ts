@@ -61,6 +61,22 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
     strict: true,
   },
   {
+    name: 'search_history',
+    description:
+      "Look up everything that happened in a date range: every ledger payment (contributions, payouts, refunds, money moved outside CoTreasury) and every activity-log event (requests, votes, rejections, rule changes, members joining or leaving). Counts and totals are calculated for you. Use it for any question about the past: what happened on a day or in a month, how many payments were made, who paid or was paid, when something was approved. For one day, use the same date for from and to.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'First day, YYYY-MM-DD (UTC)' },
+        to: { type: 'string', description: 'Last day, YYYY-MM-DD (UTC), inclusive' },
+        who: { type: 'string', description: 'Only things involving this person or payee (part of a name is fine), or empty for everyone' },
+      },
+      required: ['from', 'to', 'who'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
     name: 'check_affordability',
     description:
       'Deterministically check whether a proposed spend fits the treasury: available before/after, whether it is affordable, how many approvals the rules require for that amount, and any risk flags. Use for every "can we afford" question.',
@@ -108,6 +124,7 @@ const SYSTEM = `You are the AI Treasurer for a group that pools money (a startup
 
 How you work:
 - Never guess or compute money figures yourself. Get every number from your tools, and quote them as given.
+- For anything about the past (what happened on a date or in a period, how many payments, who paid or was paid, votes, rule changes, members joining or leaving), call search_history. Work out dates like "last month" or "two months ago" from today's date. Quote its counts and totals as given, and when listing several things put each on its own line starting with "• ", with a short date like Sep 12.
 - For "can we afford…" questions, call check_affordability with the total in cents, then say whether it's affordable, available now and after, and the approvals required, all as the tool returns them.
 - You can draft a spending request, but you cannot submit, approve, or change rules. Say so plainly if asked. Approvers decide; PayPal executes; the ledger records.
 - Approval counts come only from your tools. CoTreasury caps every requirement at the number of approvers who can actually vote, so a request is never impossible to approve: never warn that it might be, and don't do your own approval arithmetic. Mention a risk flag only if a draft carries one, in a few words.
@@ -245,6 +262,64 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
     }
   }
 
+  if (name === 'search_history') {
+    const from = new Date(`${String(input.from)}T00:00:00.000Z`)
+    const to = new Date(`${String(input.to)}T23:59:59.999Z`)
+    if (isNaN(+from) || isNaN(+to) || from > to) return { result: { error: 'Use dates as YYYY-MM-DD, with from on or before to.' }, check: 'History search failed' }
+    const who = String(input.who ?? '').trim().toLowerCase()
+    const [entries, events] = await Promise.all([
+      prisma.ledgerEntry.findMany({
+        where: { collectiveId, createdAt: { gte: from, lte: to } },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          member: { select: { name: true } },
+          proposal: { select: { title: true, proposedBy: { select: { name: true } }, approvals: { where: { decision: 'APPROVE' }, select: { member: { select: { name: true } } } } } },
+        },
+      }),
+      prisma.auditEvent.findMany({ where: { collectiveId, createdAt: { gte: from, lte: to } }, orderBy: { seq: 'asc' } }),
+    ])
+    const involves = (...texts: (string | null | undefined)[]) => !who || texts.some((t) => t?.toLowerCase().includes(who))
+    const payments = entries.filter((e) => involves(e.counterparty, e.member?.name, e.proposal?.proposedBy?.name))
+    const activity = events.filter((e) => involves(e.actor, e.summary))
+    // Totals are computed here, never by the model.
+    const confirmed = payments.filter((e) => e.status === 'CONFIRMED' && e.type !== 'UNAPPROVED_MOVEMENT')
+    const total = (xs: typeof payments) => formatMoney(xs.reduce((s, e) => s + e.amountCents, 0), cur, { cents: true })
+    const ins = confirmed.filter((e) => e.direction === 'IN')
+    const outs = confirmed.filter((e) => e.direction === 'OUT')
+    const outside = payments.filter((e) => e.type === 'UNAPPROVED_MOVEMENT')
+    const notYet = payments.filter((e) => e.status !== 'CONFIRMED' && e.type !== 'UNAPPROVED_MOVEMENT')
+    const LIMIT = 150
+    const label = input.from === input.to ? String(input.from) : `${input.from} to ${input.to}`
+    return {
+      result: {
+        period: label,
+        dates_are: 'UTC',
+        who: who || 'everyone',
+        totals: {
+          money_in: `${ins.length} payment${ins.length === 1 ? '' : 's'}, ${total(ins)}`,
+          money_out: `${outs.length} payment${outs.length === 1 ? '' : 's'}, ${total(outs)}`,
+          moved_outside_cotreasury: `${outside.length}, ${total(outside)}`,
+          pending_or_failed: notYet.length,
+          activity_events: activity.length,
+        },
+        payments: payments.slice(0, LIMIT).map((e) => ({
+          when: e.createdAt.toISOString().slice(0, 16).replace('T', ' '),
+          type: e.type,
+          amount: `${e.direction === 'IN' ? '+' : '-'}${formatMoney(e.amountCents, cur, { cents: true })}`,
+          who: e.counterparty ?? e.member?.name ?? null,
+          memo: e.memo,
+          status: e.status,
+          requested_by: e.proposal?.proposedBy?.name ?? null,
+          approved_by: e.proposal ? e.proposal.approvals.map((a) => a.member.name) : null,
+          request_title: e.proposal?.title ?? null,
+        })),
+        activity: activity.slice(0, LIMIT).map((e) => ({ when: e.createdAt.toISOString().slice(0, 16).replace('T', ' '), by: e.actor, what: e.summary, log_number: e.seq })),
+        truncated: payments.length > LIMIT || activity.length > LIMIT,
+      },
+      check: `Searched the ledger and activity log: ${label}${who ? ` · ${String(input.who).trim()}` : ''}`,
+    }
+  }
+
   if (name === 'check_affordability') {
     const amount = Number(input.amount_cents)
     const tier = tierFor(amount, c.tiers)
@@ -337,7 +412,7 @@ export async function askTreasurer(
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       max_tokens: 4000,
-      system: SYSTEM,
+      system: `${SYSTEM}\n\nToday's date (UTC): ${new Date().toISOString().slice(0, 10)}.`,
       tools: TOOLS,
       output_config: { effort: 'medium' },
       messages,

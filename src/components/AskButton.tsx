@@ -34,7 +34,7 @@ export function AskButton(props: { collectiveId: string; kind: string; currency:
   return (
     <>
       <div
-        className={`fixed right-4 bottom-4 z-40 h-[min(34rem,calc(100dvh-6rem))] w-[min(25rem,calc(100vw-2rem))] sm:right-6 sm:bottom-6 ${open ? '' : 'hidden'}`}
+        className={`fixed right-4 bottom-4 z-40 h-[min(34rem,calc(100dvh-6rem))] w-[min(25rem,calc(100vw-2rem))] sm:right-6 sm:bottom-6 lg:h-[min(46rem,calc(100dvh-6rem))] lg:w-[28rem] ${open ? '' : 'hidden'}`}
         role="dialog"
         aria-label="AI Treasurer"
       >
