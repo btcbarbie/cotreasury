@@ -138,10 +138,13 @@ append-only activity log. Each entry stores a SHA-256 hash of its own content pl
   could rewrite the whole chain consistently and the check would still pass. Publishing the latest hash
   somewhere outside CoTreasury would be needed to catch that.
 
-## AG Grid
+## AG Grid and AG Charts
 
 The shared ledger is built with **AG Grid** (community): search, money in/out filters, colour-coded amounts
 and status pills, a running balance, a pinned totals row, CSV export and a receipt for each row.
+
+The Overview tab opens with an **AG Charts** (community) bar chart of money in and out by month, built from the
+same PayPal-confirmed ledger entries, with money moved outside CoTreasury shown in red.
 
 ## What’s next
 
@@ -156,7 +159,7 @@ businesses.
 
 ## Tech stack
 
-Next.js 16 (App Router) · React · TypeScript · Prisma + SQLite · Tailwind CSS · AG Grid · Anthropic SDK ·
+Next.js 16 (App Router) · React · TypeScript · Prisma + SQLite · Tailwind CSS · AG Grid · AG Charts · Anthropic SDK ·
 PayPal REST APIs · hosted on Railway.
 
 ## Run locally
