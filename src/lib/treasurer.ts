@@ -333,7 +333,10 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
         available_now: formatMoney(treasury.availableCents, cur, { cents: true }),
         available_after: formatMoney(after, cur, { cents: true }),
         affordable: after >= 0,
-        approvals_required: tier ? `${tier.requiredApprovals} of ${approvers.length}` : 'no matching rule',
+        // Capped like a real request from this member: they can't approve their own.
+        approvals_required: tier
+          ? `${Math.max(1, Math.min(tier.requiredApprovals, approvers.filter((m) => m.id !== viewer?.id).length || approvers.length))} of ${approvers.length}`
+          : 'no matching rule',
         approvers: approvers.map((a) => a.name),
         flags,
       },
@@ -350,8 +353,9 @@ async function runTool(collectiveId: string, name: string, input: Record<string,
     if (recipients.length === 0 || recipients.some((r) => !(r.amountCents > 0))) {
       return { result: { error: 'A request needs at least one recipient with an amount.' }, check: 'Draft rejected' }
     }
-    // Same deterministic assessment the server uses when the request is submitted.
-    const a = await assessSpend(collectiveId, recipients, null)
+    // Same deterministic assessment the server uses when the request is submitted, with the
+    // member asking as the maker: they can't approve their own request, so it's capped the same way.
+    const a = await assessSpend(collectiveId, recipients, viewer?.id ?? null)
     if (!a.affordable) {
       return { result: { error: `Not affordable: ${formatMoney(a.amountCents, cur)} exceeds available ${formatMoney(a.availableCents, cur)}.` }, check: 'Draft rejected: not affordable' }
     }
