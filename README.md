@@ -116,6 +116,7 @@ initiate payments** on its own.
 - **Model:** Claude (`claude-opus-5-5`) by Anthropic, via the Anthropic TypeScript SDK with tool use.
 - **Tools** (read and draft only):
   - `get_treasury_state`: balances, goals, open requests and rules from the ledger
+  - `search_history`: looks up every payment and activity-log event for any day or period, e.g. *“What happened in September?”*
   - `check_affordability`: whether a spend fits the available balance and how many approvals it needs
   - `prepare_contribution`: pre-fills an Add funds payment that the member confirms with PayPal
   - `draft_spending_request`: drafts a payout request that the member reviews and submits
