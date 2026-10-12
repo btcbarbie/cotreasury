@@ -143,6 +143,15 @@ append-only activity log. Each entry stores a SHA-256 hash of its own content pl
 The shared ledger is built with **AG Grid** (community): search, money in/out filters, colour-coded amounts
 and status pills, a running balance, a pinned totals row, CSV export and a receipt for each row.
 
+## What’s next
+
+**A financial track record for groups.** Individuals can show a bank statement to get a loan or a grant.
+Cooperatives, savings groups and community funds usually can’t, even after years of handling money responsibly.
+Because every payment in CoTreasury is confirmed by PayPal and every decision is logged, a group’s history could
+become a verifiable record of its finances. With the right financial partners, that record could help groups
+apply for loans, grants and other financial support that today is only open to individuals and registered
+businesses.
+
 ---
 
 ## Tech stack
