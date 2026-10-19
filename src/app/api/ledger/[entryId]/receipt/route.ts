@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCaptureDetail, getPayoutItem, PayPalError } from '@/lib/paypal'
+import { canAccess } from '@/lib/collectives'
 
 export type Receipt = {
   kind: 'CAPTURE' | 'PAYOUT_ITEM'
@@ -22,7 +23,7 @@ const money = (m?: { value: string; currency_code?: string; currency?: string })
 export async function GET(_req: Request, ctx: RouteContext<'/api/ledger/[entryId]/receipt'>) {
   const { entryId } = await ctx.params
   const entry = await prisma.ledgerEntry.findUnique({ where: { id: entryId }, include: { collective: { select: { paypalAccount: true } } } })
-  if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!entry || !(await canAccess(entry.collectiveId))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!entry.paypalRef || entry.source === 'IMPORTED') {
     return NextResponse.json({ error: 'This entry was imported from earlier records, so PayPal has no receipt for it.' }, { status: 404 })
   }

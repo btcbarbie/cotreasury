@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCapture } from '@/lib/paypal'
 import { applyCaptureStatus } from '@/lib/ledger'
+import { canAccess } from '@/lib/collectives'
 
 // The browser polls this while a contribution is pending. The webhook is the
 // primary confirmation; if it hasn't arrived after a grace period we ask PayPal
@@ -11,7 +12,7 @@ const WEBHOOK_GRACE_MS = 15_000
 export async function GET(_req: Request, ctx: RouteContext<'/api/ledger/[entryId]'>) {
   const { entryId } = await ctx.params
   const found = await prisma.ledgerEntry.findUnique({ where: { id: entryId }, include: { collective: { select: { paypalAccount: true } } } })
-  if (!found) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!found || !(await canAccess(found.collectiveId))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   let entry = found
 
   if (

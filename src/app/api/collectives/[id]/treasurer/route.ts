@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { askTreasurer } from '@/lib/treasurer'
 import { randomBytes } from 'crypto'
 import { cookies } from 'next/headers'
-import { getViewer, VISITOR_COOKIE } from '@/lib/collectives'
+import { canAccess, getViewer, VISITOR_COOKIE } from '@/lib/collectives'
 import { take } from '@/lib/rateLimit'
 
 const AI_PER_HOUR = 20
@@ -13,6 +13,8 @@ export const maxDuration = 60
 
 export async function POST(req: Request, ctx: RouteContext<'/api/collectives/[id]/treasurer'>) {
   const { id } = await ctx.params
+  // Private treasuries answer only their own members (checked before spending any AI allowance).
+  if (!(await canAccess(id))) return NextResponse.json({ error: 'Collective not found' }, { status: 404 })
 
   // 20 questions an hour per visitor (cookie), with a looser backstop per network
   // address so clearing cookies doesn't remove the limit.

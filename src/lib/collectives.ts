@@ -139,3 +139,15 @@ export async function getViewer(collectiveId: string) {
   if (me || !c?.isDemo) return me ?? null
   return members.find((m) => m.role === 'ADMIN') ?? members[0] ?? null
 }
+
+/**
+ * Can this browser see this treasury's data? Demos are open to everyone; a
+ * treasury people created is private to its signed-in members. API routes use
+ * this so a private treasury's ledger, receipts and AI can't be read by anyone
+ * who merely knows an id.
+ */
+export async function canAccess(collectiveId: string) {
+  const c = await prisma.collective.findUnique({ where: { id: collectiveId }, select: { isDemo: true } })
+  if (!c) return false
+  return c.isDemo || !!(await getViewer(collectiveId))
+}
